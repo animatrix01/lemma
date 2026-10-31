@@ -1,0 +1,10 @@
+[
+  {"id":"g1","url":"https://sites.google.com/aadusd.k12.ca.us/scholarship-opportunities","expected":["GAP"],"kind":"gap"},
+  {"id":"g2","url":"https://example.com","expected":["GAP"],"kind":"gap"},
+  {"id":"g3","url":"https://sites.google.com/aadusd.k12.ca.us/scholarship-opportunities","expected":["STALE"],"kind":"stale"},
+  {"id":"g4","url":"https://sites.google.com/aadusd.k12.ca.us/scholarship-opportunities","expected":["STALE"],"kind":"stale"},
+  {"id":"g5","url":"https://sites.google.com/aadusd.k12.ca.us/scholarship-opportunities","expected":["CONFLICT"],"kind":"conflict"},
+  {"id":"g6","url":"https://sites.google.com/aadusd.k12.ca.us/scholarship-opportunities","expected":["CONFLICT"],"kind":"conflict"},
+  {"id":"g7","url":"https://example.com","expected":[],"kind":"clean"},
+  {"id":"g8","url":"https://example.com","expected":[],"kind":"clean"}
+]
