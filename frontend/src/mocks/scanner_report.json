@@ -1,0 +1,11 @@
+{
+  "id": 1,
+  "url": "https://example.com/claim-article",
+  "status": "done",
+  "findings": [
+    {"id": 1, "claim": "Scholarship amount is Rs 50,000", "quote": "Rs 50,000 per year", "span_start": 40, "span_end": 58, "stance": "CORROBORATED", "evidence": {"counter_quote": "Award of Rs. 50,000", "url": "https://gov.example.in"}},
+    {"id": 2, "claim": "Deadline is March 2024", "quote": "apply by March 2024", "span_start": 100, "span_end": 118, "stance": "REFUTED", "evidence": {"counter_quote": "Deadline extended to April 2025", "url": "https://news.example.com"}},
+    {"id": 3, "claim": "Only SC students eligible", "quote": "only SC category", "span_start": 200, "span_end": 216, "stance": "UNSUPPORTED", "evidence": {"searches": 3}},
+    {"id": 4, "claim": "Renewal automatic", "quote": "renewal is automatic", "span_start": 300, "span_end": 318, "stance": "UNDATED", "evidence": {}}
+  ]
+}
