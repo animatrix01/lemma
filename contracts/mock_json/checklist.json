@@ -1,0 +1,5 @@
+[
+  {"id": 1, "finding_id": 3, "prompt": "Verify award amount at official source", "target_hint": "official portal", "done": false},
+  {"id": 2, "finding_id": 1, "prompt": "Which deadline value is current?", "target_hint": "official portal", "done": false},
+  {"id": 3, "finding_id": 4, "prompt": "Re-confirm eligibility date at source", "target_hint": "source page", "done": false}
+]

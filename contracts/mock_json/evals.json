@@ -1,0 +1,1 @@
+{"cases": [{"id": "c1", "kind": "conflict", "passed": true, "detail": "detected"}, {"id": "c2", "kind": "gap", "passed": true, "detail": "detected"}], "summary": {"passed": 2, "total": 2}}

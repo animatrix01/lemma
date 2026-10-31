@@ -1,0 +1,16 @@
+{
+  "run_id": 1,
+  "status": "done",
+  "slots": [
+    {"id": 1, "key": "eligibility", "label": "Eligibility", "definition": "Who can apply", "is_core": true, "mapped_count": 3, "state": "Supported by sources"},
+    {"id": 2, "key": "deadline", "label": "Application deadline", "definition": "Last date to apply", "is_core": true, "mapped_count": 2, "state": "Contradicted by sources"},
+    {"id": 3, "key": "documents", "label": "Required documents", "definition": "Documents needed", "is_core": true, "mapped_count": 1, "state": "Supported by sources"},
+    {"id": 4, "key": "amount", "label": "Award amount", "definition": "Funding amount", "is_core": true, "mapped_count": 0, "state": "Not found in reviewed sources"}
+  ],
+  "findings": [
+    {"id": 1, "slot_id": 2, "slot_key": "deadline", "kind": "CONFLICT", "state": "Contradicted by sources", "detail": {"values": ["2025-03-15", "2025-04-01"], "method": "deterministic"}, "evidence": [{"id": 1, "source_id": 1, "quote": "Apply by March 15, 2025", "span_start": 120, "span_end": 142, "url": "https://example.gov.in/scholarship"}]},
+    {"id": 2, "slot_id": 2, "slot_key": "deadline", "kind": "CONFLICT", "state": "Contradicted by sources", "detail": {"values": ["2025-03-15", "2025-03-20"], "method": "llm"}, "evidence": []},
+    {"id": 3, "slot_id": 4, "slot_key": "amount", "kind": "GAP", "state": "Not found in reviewed sources", "detail": {"probes": 3}, "evidence": []},
+    {"id": 4, "slot_id": 1, "slot_key": "eligibility", "kind": "STALE", "state": "Potentially outdated", "detail": {"reference": "2024-25"}, "evidence": []}
+  ]
+}

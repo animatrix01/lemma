@@ -1,0 +1,8 @@
+{
+  "finding_id": 1,
+  "chain": [
+    {"id": 1, "source_id": 1, "quote": "Apply by March 15, 2025", "span_start": 120, "span_end": 142, "url": "https://example.gov.in/scholarship"},
+    {"id": 2, "source_id": 2, "quote": "Deadline extended to April 1, 2025", "span_start": 88, "span_end": 118, "url": "https://news.example.com/scholarship-update"}
+  ],
+  "detail": {"values": ["2025-03-15", "2025-04-01"], "method": "deterministic", "verdict": "possible conflict"}
+}

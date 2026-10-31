@@ -1,0 +1,14 @@
+[
+  {"seq": 1, "ts": "2026-10-31T10:00:00", "type": "search_query", "payload": {"query": "scholarship eligibility 2025", "results_count": 6}},
+  {"seq": 2, "ts": "2026-10-31T10:00:01", "type": "source_fetched", "payload": {"source_id": 1, "url": "https://example.gov.in/scholarship", "words": 1200, "page_date": "2025-01-10", "tier": "Official"}},
+  {"seq": 3, "ts": "2026-10-31T10:00:02", "type": "source_fetched", "payload": {"source_id": 2, "url": "https://news.example.com/update", "words": 800, "page_date": "2025-02-01", "tier": "News"}},
+  {"seq": 4, "ts": "2026-10-31T10:00:03", "type": "claim_extracted", "payload": {"source_id": 1, "count_total": 5, "samples": ["Apply by March 15, 2025"]}},
+  {"seq": 5, "ts": "2026-10-31T10:00:04", "type": "claim_extracted", "payload": {"source_id": 2, "count_total": 8, "samples": ["Deadline extended to April 1, 2025"]}},
+  {"seq": 6, "ts": "2026-10-31T10:00:05", "type": "mapping_progress", "payload": {"slot_key": "deadline", "mapped_count": 2}},
+  {"seq": 7, "ts": "2026-10-31T10:00:06", "type": "mapping_progress", "payload": {"slot_key": "eligibility", "mapped_count": 3}},
+  {"seq": 8, "ts": "2026-10-31T10:00:07", "type": "conflict_found", "payload": {"slot_key": "deadline", "values": ["2025-03-15", "2025-04-01"], "method": "deterministic", "verdict": "possible"}},
+  {"seq": 9, "ts": "2026-10-31T10:00:08", "type": "gap_probe", "payload": {"slot_key": "amount", "attempt": 1, "query": "scholarship award amount 2025", "outcome": "no results"}},
+  {"seq": 10, "ts": "2026-10-31T10:00:09", "type": "gap_probe", "payload": {"slot_key": "amount", "attempt": 2, "query": "scholarship funding value 2025", "outcome": "no results"}},
+  {"seq": 11, "ts": "2026-10-31T10:00:10", "type": "finding_finalized", "payload": {"kind": "GAP", "state": "Not found in reviewed sources"}},
+  {"seq": 12, "ts": "2026-10-31T10:00:11", "type": "stage_done", "payload": {"stage": "Analyze"}}
+]
