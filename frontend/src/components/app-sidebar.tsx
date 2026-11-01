@@ -2,22 +2,19 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Playfair_Display } from "next/font/google";
 import {
     Plus,
-    Search,
     FlaskConical,
     ChevronDown,
-    SlidersHorizontal,
-    ScanLine,
+    Trash2,
+    Pencil,
+    Check,
+    X,
 } from "lucide-react";
-import { LemmaLogo } from "@/components/lemma-logo";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { getRuns } from "@/lib/api";
-import { API_BASE } from "@/lib/api";
-import type { RunSummary } from "@/types/api";
 
 const playfairDisplay = Playfair_Display({
     weight: ["700"],
@@ -27,23 +24,11 @@ const playfairDisplay = Playfair_Display({
     display: "swap",
 });
 
-interface ScanReport {
-    id: number;
-    url: string;
-    status: string;
-    created_at?: string;
+interface ChatSession {
+    id: string;
+    title: string;
+    timestamp: number;
 }
-
-const MOCK_RECENT = [
-    "iPhone 15 Pro vs Samsung S24 — battery specs mismatch",
-    "New York Times article contradicts Reuters on GDP data",
-    "Product recall notice missing from manufacturer website",
-    "CEO interview conflicts with Q3 earnings report",
-    "Climate study cited by news — original paper shows different conclusion",
-    "Hotel cancellation policy differs between booking sites",
-    "Software license terms — vendor site vs app store listing",
-    "Medical study claims vs peer review findings",
-];
 
 interface AppSidebarProps {
     hidden: boolean;
@@ -51,41 +36,89 @@ interface AppSidebarProps {
 
 export function AppSidebar({ hidden }: AppSidebarProps) {
     const pathname = usePathname();
+    const router = useRouter();
     const [rail, setRail] = useState(false);
     const [hovered, setHovered] = useState(false);
     const [recentOpen, setRecentOpen] = useState(true);
-    const [scansOpen, setScansOpen] = useState(true);
-    const [runs, setRuns] = useState<RunSummary[]>([]);
-    const [scans, setScans] = useState<ScanReport[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [scanLoading, setScanLoading] = useState(false);
+    const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
     const [mounted, setMounted] = useState(false);
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [editingTitle, setEditingTitle] = useState("");
+    const [hoveredId, setHoveredId] = useState<string | null>(null);
 
-    const loadRuns = async () => {
-        setLoading(true);
+    const loadChatSessions = () => {
         try {
-            const r = await getRuns();
-            setRuns(r.runs || []);
+            const sessions = JSON.parse(localStorage.getItem("chat_sessions") || "[]");
+            setChatSessions(sessions.slice(0, 20)); // Show last 20 chats
         } catch {
-            setRuns([]);
-        } finally {
-            setLoading(false);
+            setChatSessions([]);
         }
     };
 
-    const loadScans = async () => {
-        setScanLoading(true);
+    const deleteChat = (sessionId: string, e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
         try {
-            const response = await fetch(`${API_BASE}/api/scanner`);
-            if (response.ok) {
-                const data = await response.json();
-                setScans(data || []);
+            // Remove from sessions list
+            const sessions = JSON.parse(localStorage.getItem("chat_sessions") || "[]");
+            const updated = sessions.filter((s: ChatSession) => s.id !== sessionId);
+            localStorage.setItem("chat_sessions", JSON.stringify(updated));
+            
+            // Remove the actual chat messages
+            localStorage.removeItem(`chat_${sessionId}`);
+            
+            // Refresh the list
+            loadChatSessions();
+            
+            // If we're on this chat page, redirect to dashboard
+            if (pathname === `/c/${sessionId}`) {
+                router.push('/dashboard');
             }
-        } catch {
-            setScans([]);
-        } finally {
-            setScanLoading(false);
+        } catch (e) {
+            console.error("Failed to delete chat:", e);
         }
+    };
+
+    const startEditing = (session: ChatSession, e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setEditingId(session.id);
+        setEditingTitle(session.title);
+    };
+
+    const saveEdit = (sessionId: string, e?: React.MouseEvent) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        if (!editingTitle.trim()) {
+            cancelEdit();
+            return;
+        }
+        
+        try {
+            const sessions = JSON.parse(localStorage.getItem("chat_sessions") || "[]");
+            const updated = sessions.map((s: ChatSession) => 
+                s.id === sessionId ? { ...s, title: editingTitle.trim() } : s
+            );
+            localStorage.setItem("chat_sessions", JSON.stringify(updated));
+            loadChatSessions();
+            setEditingId(null);
+            setEditingTitle("");
+        } catch (e) {
+            console.error("Failed to save edit:", e);
+        }
+    };
+
+    const cancelEdit = (e?: React.MouseEvent) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        setEditingId(null);
+        setEditingTitle("");
     };
 
     useEffect(() => {
@@ -94,16 +127,14 @@ export function AppSidebar({ hidden }: AppSidebarProps) {
 
     useEffect(() => {
         if (!mounted) return;
-        loadRuns();
-        loadScans();
-        // Refresh lists every 5 seconds when on relevant pages
-        if (pathname === "/" || pathname === "/scan") {
-            const interval = setInterval(() => {
-                loadRuns();
-                loadScans();
-            }, 5000);
-            return () => clearInterval(interval);
-        }
+        loadChatSessions();
+        
+        // Refresh chat sessions every 2 seconds to catch new chats
+        const interval = setInterval(() => {
+            loadChatSessions();
+        }, 2000);
+        
+        return () => clearInterval(interval);
     }, [pathname, mounted]);
 
     if (hidden) return null;
@@ -112,21 +143,7 @@ export function AppSidebar({ hidden }: AppSidebarProps) {
 
     const items = [
         { label: "New Analysis", href: "/dashboard", icon: Plus },
-        { label: "Scan a Source", href: "/scan", icon: Search },
         { label: "Evals", href: "/evals", icon: FlaskConical },
-    ];
-
-    const recentItems = [
-        ...runs
-            .filter((r) => r.id > 0)
-            .sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())
-            .slice(0, 10)
-            .map((r) => ({ 
-                key: `run-${r.id}`, 
-                topic: r.topic, 
-                href: `/runs/${r.id}`,
-                status: r.status 
-            })),
     ];
 
     return (
@@ -190,7 +207,7 @@ export function AppSidebar({ hidden }: AppSidebarProps) {
                     msOverflowStyle: 'none',
                 }}
             >
-                {/* Analysis History */}
+                {/* Chat History */}
                 {mounted && (
                     <>
                         <div
@@ -202,11 +219,11 @@ export function AppSidebar({ hidden }: AppSidebarProps) {
                             {expanded && (
                                 <button
                                     type="button"
-                                    title="Toggle recent analyses"
+                                    title="Toggle recent chats"
                                     onClick={() => setRecentOpen(!recentOpen)}
                                     className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
                                 >
-                                    Recent Analyses
+                                    Recent Chats
                                     <ChevronDown
                                         className={cn(
                                             "w-4 h-4 transition-transform",
@@ -219,107 +236,93 @@ export function AppSidebar({ hidden }: AppSidebarProps) {
 
                         {expanded && recentOpen && (
                             <div className="flex flex-col gap-1 mb-4">
-                                {loading && (
-                                    <div className="px-3 py-2 text-center text-sm text-muted-foreground">
-                                        Loading...
-                                    </div>
-                                )}
-                                {!loading && recentItems.length === 0 && (
+                                {chatSessions.length === 0 && (
                                     <div className="px-3 py-2 text-center text-xs text-muted-foreground">
-                                        No analyses yet
+                                        No chats yet
                                     </div>
                                 )}
-                                {!loading && recentItems.map((item) => {
-                                    const inner = (
-                                        <div className="group flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-muted transition-colors">
-                                            <span className={cn(
-                                                "h-2 w-2 shrink-0 rounded-full",
-                                                item.status === "analyzed" ? "bg-emerald-400/80" :
-                                                item.status === "running" ? "bg-[#FACC15] animate-pulse" :
-                                                "bg-muted-foreground/50"
-                                            )} />
-                                            <span className="truncate text-[15px] text-muted-foreground group-hover:text-foreground leading-snug">
-                                                {item.topic}
-                                            </span>
-                                        </div>
-                                    );
-                                    return item.href ? (
-                                        <Link key={item.key} href={item.href} className="block">
-                                            {inner}
-                                        </Link>
-                                    ) : (
-                                        <div key={item.key}>{inner}</div>
-                                    );
-                                })}
-                            </div>
-                        )}
+                                {chatSessions.map((session) => {
+                                    const isEditing = editingId === session.id;
+                                    const isHovered = hoveredId === session.id;
+                                    const isActive = pathname === `/c/${session.id}`;
 
-                        {/* Scan History */}
-                        <div
-                            className={cn(
-                                "flex items-center justify-between px-3 mb-2 mt-2",
-                                !expanded && "justify-center"
-                            )}
-                        >
-                            {expanded && (
-                                <button
-                                    type="button"
-                                    title="Toggle scan history"
-                                    onClick={() => setScansOpen(!scansOpen)}
-                                    className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
-                                >
-                                    Scan History
-                                    <ChevronDown
-                                        className={cn(
-                                            "w-4 h-4 transition-transform",
-                                            !scansOpen && "-rotate-90"
-                                        )}
-                                    />
-                                </button>
-                            )}
-                        </div>
-
-                        {expanded && scansOpen && (
-                            <div className="flex flex-col gap-1 pb-2">
-                                {scanLoading && (
-                                    <div className="px-3 py-2 text-center text-sm text-muted-foreground">
-                                        Loading...
-                                    </div>
-                                )}
-                                {!scanLoading && scans.length === 0 && (
-                                    <div className="px-3 py-2 text-center text-xs text-muted-foreground">
-                                        No scans yet
-                                    </div>
-                                )}
-                                {!scanLoading && scans.map((scan) => {
-                                    let displayUrl = scan.url;
-                                    try {
-                                        displayUrl = new URL(scan.url).hostname.replace('www.', '');
-                                    } catch {
-                                        // If URL parsing fails, just use the original URL
-                                        displayUrl = scan.url.substring(0, 50);
-                                    }
                                     return (
-                                        <Link 
-                                            key={scan.id} 
-                                            href={`/scan?report=${scan.id}`}
-                                            className="block"
+                                        <div
+                                            key={session.id}
+                                            className="relative group"
+                                            onMouseEnter={() => setHoveredId(session.id)}
+                                            onMouseLeave={() => setHoveredId(null)}
                                         >
-                                            <div className="group flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-muted transition-colors">
-                                                <ScanLine className={cn(
-                                                    "h-3.5 w-3.5 shrink-0",
-                                                    scan.status === "done" ? "text-emerald-400/80" :
-                                                    scan.status === "running" ? "text-[#FACC15] animate-pulse" :
-                                                    scan.status === "failed" ? "text-red-400/80" :
-                                                    "text-muted-foreground/50"
-                                                )} />
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="truncate text-[15px] text-muted-foreground group-hover:text-foreground leading-snug">
-                                                        {displayUrl}
-                                                    </p>
+                                            {isEditing ? (
+                                                <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-muted">
+                                                    <input
+                                                        type="text"
+                                                        value={editingTitle}
+                                                        onChange={(e) => setEditingTitle(e.target.value)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === "Enter") saveEdit(session.id);
+                                                            if (e.key === "Escape") cancelEdit();
+                                                        }}
+                                                        className="flex-1 bg-transparent border-none outline-none text-[15px] text-foreground"
+                                                        autoFocus
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    />
+                                                    <button
+                                                        onClick={(e) => saveEdit(session.id, e)}
+                                                        className="p-1 hover:bg-white/10 rounded transition-colors shrink-0"
+                                                    >
+                                                        <Check className="w-3.5 h-3.5 text-green-500" />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => cancelEdit(e)}
+                                                        className="p-1 hover:bg-white/10 rounded transition-colors shrink-0"
+                                                    >
+                                                        <X className="w-3.5 h-3.5 text-red-500" />
+                                                    </button>
                                                 </div>
-                                            </div>
-                                        </Link>
+                                            ) : (
+                                                <Link 
+                                                    href={`/c/${session.id}`}
+                                                    className="block"
+                                                >
+                                                    <div className={cn(
+                                                        "group/item flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 transition-colors pr-2",
+                                                        isActive ? "bg-muted" : "hover:bg-muted"
+                                                    )}>
+                                                        <svg 
+                                                            className="w-4 h-4 shrink-0 text-muted-foreground"
+                                                            viewBox="0 0 24 24" 
+                                                            fill="none" 
+                                                            stroke="currentColor" 
+                                                            strokeWidth="2"
+                                                        >
+                                                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                                                        </svg>
+                                                        <span className="truncate text-[15px] text-muted-foreground group-hover/item:text-foreground leading-snug flex-1">
+                                                            {session.title}
+                                                        </span>
+                                                        {(isHovered || isActive) && (
+                                                            <div className="flex items-center gap-1 shrink-0">
+                                                                <button
+                                                                    onClick={(e) => startEditing(session, e)}
+                                                                    className="p-1.5 hover:bg-white/10 rounded transition-colors opacity-0 group-hover/item:opacity-100"
+                                                                    title="Rename"
+                                                                >
+                                                                    <Pencil className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={(e) => deleteChat(session.id, e)}
+                                                                    className="p-1.5 hover:bg-red-500/10 rounded transition-colors opacity-0 group-hover/item:opacity-100"
+                                                                    title="Delete"
+                                                                >
+                                                                    <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-red-500" />
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </Link>
+                                            )}
+                                        </div>
                                     );
                                 })}
                             </div>

@@ -56,8 +56,13 @@ export function AuthButtons() {
     const [userEmail, setUserEmail] = useState<string | null>(null);
 
     useEffect(() => {
+        const auth = localStorage.getItem("lemma_auth");
         const email = localStorage.getItem("lemma_user");
-        setUserEmail(email);
+        if (auth === "true") {
+            setUserEmail(email || "Guest");
+        } else {
+            setUserEmail(null);
+        }
     }, []);
 
     function handleLogout() {

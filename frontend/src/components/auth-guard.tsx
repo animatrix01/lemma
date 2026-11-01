@@ -2,7 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LemmaLogo } from "@/components/lemma-logo";
+import { Playfair_Display } from "next/font/google";
+
+const playfairDisplay = Playfair_Display({
+    weight: ["700"],
+    subsets: ["latin"],
+    style: ["italic"],
+    variable: "--font-playfair",
+    display: "swap",
+});
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
     const router = useRouter();
@@ -22,7 +30,9 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     if (isLoading) {
         return (
             <div className="h-screen w-screen flex items-center justify-center bg-background">
-                <LemmaLogo className="w-16 h-16 text-[#FACC15] animate-pulse" />
+                <span className={`${playfairDisplay.variable} font-playfair text-5xl font-bold italic text-white animate-pulse`}>
+                    Lemma
+                </span>
             </div>
         );
     }

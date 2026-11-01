@@ -11,9 +11,9 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="h-full antialiased dark" contentEditable="false" suppressContentEditableWarning>
+    <html lang="en" className="h-full antialiased dark bg-[#0d0908]" contentEditable="false" suppressContentEditableWarning>
       <body 
-        className="min-h-full flex" 
+        className="min-h-full flex bg-[#0d0908]" 
         contentEditable="false" 
         suppressContentEditableWarning
         style={{
@@ -24,7 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       >
         <DisableEditMode />
         <TooltipProvider>
-          <main className="flex-1 min-w-0">{children}</main>
+          <main className="flex-1 min-w-0 bg-[#0d0908]">{children}</main>
         </TooltipProvider>
       </body>
     </html>
