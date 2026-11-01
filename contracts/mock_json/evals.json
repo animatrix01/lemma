@@ -39,42 +39,21 @@
       "detail": "Verified Apple.com, GSMArena, Qualcomm, TSMC sources. All report: A17 Pro chip (3nm), 8GB RAM, 6.7\" OLED (2796×1290), 48MP main camera, USB-C 3.0, 4422mAh battery. Zero discrepancies across 15 reviewed sources including retail partners and tech reviewers.",
       "confidence": 0.99,
       "found": []
-    },
-    {
-      "id": "multi-vaccine-001",
-      "description": "COVID-19 vaccination dashboard: stale data and missing methodology",
-      "topic": "Johns Hopkins COVID-19 vaccination tracker reliability",
-      "kind": "multi",
-      "passed": true,
-      "detail": "Dashboard shows 'Last updated: May 2024' (6 months stale). Additionally, no methodology documentation for how 'fully vaccinated' is calculated (2 doses vs 3 doses inconsistency). Missing links to CDC WONDER database as data source. Detected both staleness and critical gaps.",
-      "confidence": 0.94,
-      "found": ["GAP", "STALE"]
-    },
-    {
-      "id": "conflict-research-003",
-      "description": "Climate study findings misrepresented in news coverage",
-      "topic": "Nature Climate Change: Global warming acceleration study Nov 2024",
-      "kind": "conflict",
-      "passed": true,
-      "detail": "Reuters headline: 'Scientists warn warming accelerating 50% faster than predicted.' Original Nature study abstract states: 'Observed warming 15-22% above mid-range model projections for 2020-2024 period.' 50% claim appears nowhere in paper. Detected across 8 news outlets amplifying incorrect figure.",
-      "confidence": 0.89,
-      "found": ["CONFLICT"]
     }
   ],
   "summary": {
-    "passed": 6,
-    "total": 6,
+    "passed": 4,
+    "total": 4,
     "accuracy": 1.0,
     "precision": 0.96,
     "recall": 0.95,
     "f1_score": 0.955,
-    "avg_confidence": 0.952,
+    "avg_confidence": 0.97,
     "by_kind": {
       "gap": {"total": 1, "passed": 1, "accuracy": 1.0},
       "stale": {"total": 1, "passed": 1, "accuracy": 1.0},
-      "conflict": {"total": 2, "passed": 2, "accuracy": 1.0},
-      "clean": {"total": 1, "passed": 1, "accuracy": 1.0},
-      "multi": {"total": 1, "passed": 1, "accuracy": 1.0}
+      "conflict": {"total": 1, "passed": 1, "accuracy": 1.0},
+      "clean": {"total": 1, "passed": 1, "accuracy": 1.0}
     }
   },
   "metadata": {
