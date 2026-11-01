@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Lemma History</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 600px;
+            margin: 100px auto;
+            padding: 20px;
+            background: #0d0908;
+            color: white;
+        }
+        button {
+            background: #FACC15;
+            color: black;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+        .danger {
+            background: #ef4444;
+            color: white;
+        }
+        .success {
+            background: #10b981;
+            color: white;
+        }
+        #status {
+            margin-top: 20px;
+            padding: 12px;
+            border-radius: 8px;
+            display: none;
+        }
+        .info {
+            background: #3b82f6;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>Clear Lemma History</h1>
+    <p>This will clear all chat sessions and analysis history from your browser's local storage.</p>
+    
+    <button onclick="clearChatHistory()" class="danger">Clear Chat History</button>
+    <button onclick="clearAll()" class="danger">Clear All History</button>
+    <button onclick="window.location.href='http://localhost:3000/dashboard'">Go to Dashboard</button>
+    
+    <div id="status"></div>
+
+    <script>
+        function showStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = type;
+            status.style.display = 'block';
+            setTimeout(() => {
+                status.style.display = 'none';
+            }, 3000);
+        }
+
+        function clearChatHistory() {
+            try {
+                // Clear chat sessions list
+                localStorage.removeItem('chat_sessions');
+                
+                // Clear individual chat messages
+                const keys = Object.keys(localStorage);
+                keys.forEach(key => {
+                    if (key.startsWith('chat_') || key.startsWith('lemma_chat_')) {
+                        localStorage.removeItem(key);
+                    }
+                });
+                
+                showStatus('Chat history cleared successfully!', 'success');
+            } catch (e) {
+                showStatus('Error clearing chat history: ' + e.message, 'danger');
+            }
+        }
+
+        function clearAll() {
+            try {
+                localStorage.clear();
+                showStatus('All history cleared successfully!', 'success');
+            } catch (e) {
+                showStatus('Error clearing history: ' + e.message, 'danger');
+            }
+        }
+    </script>
+</body>
+</html>
