@@ -45,6 +45,20 @@ class AnalyzeResponse(BaseModel):
     status: Literal["queued"] = "queued"
 
 
+# ---------- chat (lightweight conversational layer) ----------
+
+class ChatRequest(BaseModel):
+    message: str
+    history: List[dict] = Field(default_factory=list)  # [{role, content}, ...]
+
+
+class ChatResponse(BaseModel):
+    intent: str  # "chat" | "research"
+    reply: str
+    research_query: Optional[str] = None
+    run_id: Optional[int] = None  # set when intent == "research" and a run was started
+
+
 # ---------- sources ----------
 class SourceOut(BaseModel):
     id: int
