@@ -162,11 +162,14 @@ interface ClaudeChatInputProps {
         isThinkingEnabled: boolean;
     }) => void;
     disabled?: boolean;
+    readOnly?: boolean;
+    onFocus?: () => void;
     placeholder?: string;
+    initialMessage?: string;
 }
 
-export const ClaudeChatInput: React.FC<ClaudeChatInputProps> = ({ onSendMessage, disabled = false, placeholder = "Ask anything..." }) => {
-    const [message, setMessage] = useState("");
+export const ClaudeChatInput: React.FC<ClaudeChatInputProps> = ({ onSendMessage, disabled = false, readOnly = false, onFocus, placeholder = "Ask anything...", initialMessage }) => {
+    const [message, setMessage] = useState(initialMessage || "");
     const [files, setFiles] = useState<AttachedFile[]>([]);
     const [pastedContent, setPastedContent] = useState<PastedSnippet[]>([]);
     const [isDragging, setIsDragging] = useState(false);
@@ -179,6 +182,8 @@ export const ClaudeChatInput: React.FC<ClaudeChatInputProps> = ({ onSendMessage,
     const imageInputRef = useRef<HTMLInputElement>(null);
     const pdfInputRef = useRef<HTMLInputElement>(null);
     const micRef = useRef<MicIconHandle>(null);
+    const recognitionRef = useRef<any>(null);
+    const baseMessageRef = useRef<string>("");
 
     const placeholders = [
         "What are you trying to verify?",
@@ -201,10 +206,22 @@ export const ClaudeChatInput: React.FC<ClaudeChatInputProps> = ({ onSendMessage,
     }, [placeholders.length]);
 
     useEffect(() => {
-        if (textareaRef.current) {
-            textareaRef.current.style.height = "auto";
-            textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 384) + "px";
+        if (initialMessage) {
+            setMessage(initialMessage);
         }
+    }, [initialMessage]);
+
+    const adjustTextareaHeight = () => {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+        
+        textarea.style.height = 'auto';
+        const newHeight = Math.min(Math.max(textarea.scrollHeight, 28), 200);
+        textarea.style.height = `${newHeight}px`;
+    };
+
+    useEffect(() => {
+        adjustTextareaHeight();
     }, [message]);
 
     const handleFiles = useCallback((newFilesList: FileList | File[]) => {
@@ -275,6 +292,61 @@ export const ClaudeChatInput: React.FC<ClaudeChatInputProps> = ({ onSendMessage,
         }
     };
 
+    const toggleListening = () => {
+        if (isListening) {
+            recognitionRef.current?.stop();
+            recognitionRef.current = null;
+            setIsListening(false);
+            micRef.current?.stopAnimation();
+            return;
+        }
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            alert("Voice input is not supported in this browser. Try Chrome or Edge.");
+            return;
+        }
+        baseMessageRef.current = message;
+        const rec = new SpeechRecognition();
+        rec.continuous = true;
+        rec.interimResults = true;
+        rec.lang = "en-US";
+        rec.onresult = (event: any) => {
+            let finalTranscript = "";
+            let interimTranscript = "";
+            for (let i = 0; i < event.results.length; i++) {
+                const t = event.results[i][0].transcript;
+                if (event.results[i].isFinal) finalTranscript += t + " ";
+                else interimTranscript += t;
+            }
+            const base = baseMessageRef.current;
+            setMessage(((base ? base + " " : "") + finalTranscript + interimTranscript).trim());
+        };
+        rec.onerror = () => {
+            setIsListening(false);
+            micRef.current?.stopAnimation();
+        };
+        rec.onend = () => {
+            setIsListening(false);
+            micRef.current?.stopAnimation();
+        };
+        recognitionRef.current = rec;
+        try {
+            rec.start();
+            setIsListening(true);
+            micRef.current?.startAnimation();
+        } catch {
+            setIsListening(false);
+            micRef.current?.stopAnimation();
+        }
+    };
+
+    useEffect(() => {
+        return () => {
+            recognitionRef.current?.stop();
+            recognitionRef.current = null;
+        };
+    }, []);
+
     const handleSend = () => {
         if (!message.trim() && files.length === 0 && pastedContent.length === 0) return;
         onSendMessage({ message, files, pastedContent, model: "sonnet-4.5", isThinkingEnabled });
@@ -322,20 +394,30 @@ export const ClaudeChatInput: React.FC<ClaudeChatInputProps> = ({ onSendMessage,
                 )}
 
                 {/* Text row */}
-                <div className="px-5 pt-4 pb-2 relative">
+                <div className="px-5 pt-5 pb-3 relative">
                     <div className="relative flex items-start">
                         <textarea
                             ref={textareaRef}
                             value={message}
-                            onChange={(e) => setMessage(e.target.value)}
+                            onChange={(e) => {
+                                setMessage(e.target.value);
+                                adjustTextareaHeight();
+                            }}
                             onPaste={handlePaste}
                             onKeyDown={handleKeyDown}
+                            onFocus={onFocus}
                             placeholder=" "
                             disabled={disabled}
-                            className="w-full bg-transparent border-0 outline-none text-white text-[15px] placeholder:text-transparent resize-none overflow-hidden py-0.5 leading-normal block antialiased"
+                            readOnly={readOnly}
+                            className="w-full bg-transparent border-0 outline-none text-white text-[15px] placeholder:text-transparent resize-none py-0.5 leading-relaxed block antialiased overflow-y-hidden"
                             rows={1}
-                            autoFocus
-                            style={{ minHeight: '100px', maxHeight: '200px' }}
+                            autoFocus={!readOnly}
+                            style={{ 
+                                minHeight: '56px',
+                                maxHeight: '200px',
+                                scrollbarWidth: 'none',
+                                msOverflowStyle: 'none'
+                            }}
                         />
                         {!message && (
                             <div className="absolute inset-0 pointer-events-none flex items-start pt-0.5">
@@ -352,82 +434,89 @@ export const ClaudeChatInput: React.FC<ClaudeChatInputProps> = ({ onSendMessage,
                 </div>
 
                 {/* Action row — attach | spacer | Plan, mic, send */}
-                <div className="flex items-center justify-between px-3.5 pb-3 pt-1 gap-2">
+                <div className="flex items-center justify-between px-4 pb-4 pt-2 gap-2">
                     <div className="flex items-center gap-1.5">
                         <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <button
-                                            className="flex h-10 w-10 items-center justify-center rounded-full text-white bg-zinc-700/50 hover:bg-zinc-600/60 active:scale-95 transition-all duration-150"
-                                            type="button"
-                                            aria-label="Attach files"
-                                        >
-                                            <Icons.Plus className="w-5 h-5" />
-                                        </button>
-                                    </DropdownMenuTrigger>
+                            <DropdownMenuTrigger asChild>
+                                <button
+                                    className="flex h-10 w-10 items-center justify-center rounded-full text-white bg-zinc-700/50 hover:bg-zinc-600/60 active:scale-95 transition-all duration-150"
+                                    type="button"
+                                    aria-label="Attach files"
+                                >
+                                    <Icons.Plus className="w-5 h-5" />
+                                </button>
+                            </DropdownMenuTrigger>
                             <DropdownMenuContent
-                                        align="start"
-                                        side="top"
-                                        sideOffset={10}
-                                        className="w-60 rounded-xl border-zinc-700/70 bg-[#262626] p-1.5 shadow-2xl"
+                                align="start"
+                                side="bottom"
+                                sideOffset={10}
+                                className="w-60 rounded-xl border-zinc-700/70 bg-[#262626] p-1.5 shadow-2xl"
+                            >
+                                <DropdownMenuItem
+                                    onClick={() => pdfInputRef.current?.click()}
+                                    className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:bg-zinc-700/50 focus:text-white"
+                                >
+                                    <Icons.FileText className="h-4 w-4 shrink-0 text-zinc-400" />
+                                    <span>Upload or add files</span>
+                                    <span className="ml-auto text-xs text-zinc-500">PDF, DOCX</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator className="my-1 bg-zinc-700/50" />
+                                <DropdownMenuItem
+                                    onClick={() => imageInputRef.current?.click()}
+                                    className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:bg-zinc-700/50 focus:text-white"
+                                >
+                                    <Icons.Image className="h-4 w-4 shrink-0 text-zinc-400" />
+                                    <span>Add photos</span>
+                                    <span className="ml-auto text-xs text-zinc-500">PNG, JPG</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator className="my-1 bg-zinc-700/50" />
+                                <DropdownMenuItem
+                                    onClick={() => {
+                                        setMessage("Scan this article and verify its claims:\n\n[Paste article URL here]");
+                                        textareaRef.current?.focus();
+                                    }}
+                                    className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:bg-zinc-700/50 focus:text-white"
+                                >
+                                    <svg 
+                                        className="h-4 w-4 shrink-0 text-zinc-400" 
+                                        viewBox="0 0 24 24" 
+                                        fill="none" 
+                                        stroke="currentColor" 
+                                        strokeWidth="2"
                                     >
-                                        <DropdownMenuItem
-                                            onClick={() => pdfInputRef.current?.click()}
-                                            className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:bg-zinc-700/50 focus:text-white"
-                                        >
-                                            <Icons.FileText className="h-4 w-4 shrink-0 text-zinc-400" />
-                                            <span>Upload or add files</span>
-                                            <span className="ml-auto text-xs text-zinc-500">PDF, DOCX</span>
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator className="my-1 bg-zinc-700/50" />
-                                        <DropdownMenuItem
-                                            onClick={() => imageInputRef.current?.click()}
-                                            className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:bg-zinc-700/50 focus:text-white"
-                                        >
-                                            <Icons.Image className="h-4 w-4 shrink-0 text-zinc-400" />
-                                            <span>Add photos</span>
-                                            <span className="ml-auto text-xs text-zinc-500">PNG, JPG</span>
-                                        </DropdownMenuItem>
+                                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                                    </svg>
+                                    <span>Scan a source</span>
+                                    <span className="ml-auto text-xs text-zinc-500">URL</span>
+                                </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                         <Tooltip>
                             <TooltipTrigger
+                                type="button"
                                 onClick={() => setIsThinkingEnabled(!isThinkingEnabled)}
                                 className={`transition-all duration-200 h-10 px-4 flex items-center justify-center gap-1.5 rounded-full active:scale-95 group relative overflow-hidden
                                     ${isThinkingEnabled
-                                        ? 'text-white bg-gradient-to-r from-blue-500 to-blue-600 shadow-lg shadow-blue-500/50'
-                                        : 'text-zinc-400 hover:text-white hover:bg-zinc-700/50'}
+                                        ? 'text-white bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-500/30'
+                                        : 'text-zinc-400 hover:text-white bg-transparent hover:bg-zinc-700/50'}
                                 `}
                                 aria-pressed={isThinkingEnabled}
                                 aria-label="Think mode"
                             >
-                                {isThinkingEnabled && (
-                                    <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer"
-                                        style={{
-                                            backgroundSize: '200% 100%',
-                                            animation: 'shimmer 2s infinite linear'
-                                        }}
-                                    />
-                                )}
-                                <Icons.Brain className="w-4 h-4 relative z-10" />
-                                <span className="text-sm font-medium relative z-10">Plan</span>
+                                <Icons.Brain className={`w-4 h-4 relative z-10 transition-transform ${isThinkingEnabled ? 'scale-110' : 'scale-100'}`} />
+                                <span className="text-sm font-medium relative z-10">Think</span>
                             </TooltipTrigger>
                             <TooltipContent>
-                                <p>Enable deep reasoning</p>
+                                <p>{isThinkingEnabled ? 'Deep reasoning enabled' : 'Enable deep reasoning'}</p>
                             </TooltipContent>
                         </Tooltip>
                         <Tooltip>
                             <TooltipTrigger
-                                onClick={() => {
-                                    if (!isListening) {
-                                        micRef.current?.startAnimation();
-                                        setIsListening(true);
-                                    } else {
-                                        micRef.current?.stopAnimation();
-                                        setIsListening(false);
-                                    }
-                                }}
+                                type="button"
+                                onClick={toggleListening}
                                 onMouseEnter={() => micRef.current?.startAnimation()}
                                 onMouseLeave={() => {
                                     if (!isListening) micRef.current?.stopAnimation();
@@ -437,7 +526,6 @@ export const ClaudeChatInput: React.FC<ClaudeChatInputProps> = ({ onSendMessage,
                                         ? 'text-primary bg-primary/10 animate-pulse'
                                         : 'text-zinc-400 hover:text-white hover:bg-zinc-700/50'}
                                 `}
-                                type="button"
                                 aria-pressed={isListening}
                                 aria-label="Voice input"
                             >
@@ -454,12 +542,12 @@ export const ClaudeChatInput: React.FC<ClaudeChatInputProps> = ({ onSendMessage,
                                 inline-flex items-center justify-center gap-1.5 relative shrink-0 transition-all duration-200 h-10 px-6 rounded-full active:scale-95 font-medium text-[15px]
                                 ${hasContent
                                     ? 'bg-white text-black hover:bg-zinc-200 shadow-md shadow-black/30'
-                                    : 'bg-white/85 text-black/50 hover:bg-white cursor-pointer'}
+                                    : 'bg-white/85 text-black hover:bg-white cursor-pointer'}
                             `}
                             type="button"
                             aria-label="Send message"
                         >
-                            Build now
+                            Analyze
                             <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-black/10 text-black">
                                 <Icons.ArrowUp className="w-4 h-4" />
                             </span>
