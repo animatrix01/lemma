@@ -1,9 +1,9 @@
 import asyncio
+from datetime import datetime, timezone
 from backend.ingest.fetch import fetch_one
 from backend.engine.claims import extract_claims_from_source
 from backend.db import models
 from backend.db.database import SessionLocal
-from backend.sse import bus
 from backend.config import settings
 from backend.llm_router import chat
 from backend.nli_module import nli_verdict
@@ -11,19 +11,31 @@ from tavily import TavilyClient
 
 
 SCANNER_QUEUES = {}
+SCANNER_EVENTS = {}
 
 
 def get_q(report_id):
     if report_id not in SCANNER_QUEUES:
         SCANNER_QUEUES[report_id] = asyncio.Queue()
+    SCANNER_EVENTS.setdefault(report_id, [])
     return SCANNER_QUEUES[report_id]
 
 
 def emit_scanner(report_id, etype, payload):
-    # etype should be scanner_*; store not in run_events. We'll just queue.
+    events = SCANNER_EVENTS.setdefault(report_id, [])
+    item = {
+        "seq": len(events) + 1,
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "type": etype,
+        "payload": payload or {},
+    }
+    events.append(item)
     q = SCANNER_QUEUES.get(report_id)
     if q is not None:
-        q.put_nowait({"seq": 0, "ts": None, "type": etype, "payload": payload})
+        try:
+            q.put_nowait(item)
+        except asyncio.QueueFull:
+            pass
 
 
 async def run_scanner(report_id: int, url: str):
@@ -36,7 +48,8 @@ async def run_scanner(report_id: int, url: str):
             db.commit()
     finally:
         db.close()
-    
+    emit_scanner(report_id, "scanner_check", {"claim": "Fetching article", "results": 0, "message": "Fetching article content"})
+
     # fetch
     try:
         res = await fetch_one(url)
@@ -50,7 +63,6 @@ async def run_scanner(report_id: int, url: str):
         finally:
             db.close()
         emit_scanner(report_id, "scanner_failed", {"error": f"Failed to fetch URL: {str(e)}"})
-        SCANNER_QUEUES.pop(report_id, None)
         return
     
     text = res.get("text") or ""
@@ -66,12 +78,23 @@ async def run_scanner(report_id: int, url: str):
         finally:
             db.close()
         emit_scanner(report_id, "scanner_failed", {"error": "Could not extract article content. The page may be behind a paywall or require JavaScript."})
-        SCANNER_QUEUES.pop(report_id, None)
         return
     
     emit_scanner(report_id, "scanner_claim_extracted", {"message": f"Extracted {len(text)} characters from article"})
-    
-    claims = extract_claims_from_source(text)
+
+    try:
+        claims = extract_claims_from_source(text)
+    except Exception as e:
+        db = SessionLocal()
+        try:
+            report = db.query(models.ScannerReport).filter(models.ScannerReport.id == report_id).first()
+            if report:
+                report.status = "failed"
+                db.commit()
+        finally:
+            db.close()
+        emit_scanner(report_id, "scanner_failed", {"error": f"Claim extraction failed: {str(e)}"})
+        return
     
     # Check if claims were extracted
     if not claims:
@@ -84,7 +107,6 @@ async def run_scanner(report_id: int, url: str):
         finally:
             db.close()
         emit_scanner(report_id, "scanner_done", {"report_id": report_id, "message": "No factual claims found in article"})
-        SCANNER_QUEUES.pop(report_id, None)
         return
     
     # check-worthiness: sort by length/numbers; cap
@@ -144,7 +166,6 @@ async def run_scanner(report_id: int, url: str):
     finally:
         db.close()
     emit_scanner(report_id, "scanner_done", {"report_id": report_id})
-    SCANNER_QUEUES.pop(report_id, None)
 
 
 def _stance_verdict(claim, quote, counter_text):
