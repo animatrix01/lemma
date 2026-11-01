@@ -76,6 +76,10 @@ def matrix(run_id: int):
     s = SessionLocal()
     try:
         run = s.query(models.Run).filter(models.Run.id == run_id).first()
+        if not run:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
+        
         slots = s.query(models.Slot).filter(models.Slot.run_id == run_id).all()
         claims = s.query(models.Claim).filter(models.Claim.run_id == run_id).all()
         findings = s.query(models.Finding).filter(models.Finding.run_id == run_id).all()
@@ -99,6 +103,27 @@ def matrix(run_id: int):
                 sk = sl.key if sl else None
             finding_outs.append(FindingOut(id=f.id, slot_id=f.slot_id, slot_key=sk, kind=f.kind, state=f.state, detail=f.detail_json or {}, evidence=ev_out))
         return MatrixResponse(run_id=run_id, status=run.status if run else "unknown", slots=slot_outs, findings=finding_outs)
+    finally:
+        s.close()
+
+
+@router.get("/api/runs/{run_id}/checklist")
+def get_checklist(run_id: int):
+    from backend.db.database import SessionLocal
+    s = SessionLocal()
+    try:
+        items = s.query(models.ChecklistItem).filter(models.ChecklistItem.run_id == run_id).all()
+        return [
+            ChecklistItemOut(
+                id=item.id,
+                run_id=item.run_id,
+                finding_id=item.finding_id,
+                prompt=item.prompt,
+                target_hint=item.target_hint,
+                done=item.done
+            )
+            for item in items
+        ]
     finally:
         s.close()
 
@@ -170,11 +195,61 @@ async def scanner_status(report_id: int):
     return StreamingResponse(gen(), media_type="text/event-stream")
 
 
+@router.get("/api/scanner/{report_id}", response_model=ScannerReportOut)
+def get_scanner_report(report_id: int):
+    from backend.db.database import SessionLocal
+    from fastapi import HTTPException
+    s = SessionLocal()
+    try:
+        report = s.query(models.ScannerReport).filter(models.ScannerReport.id == report_id).first()
+        if not report:
+            raise HTTPException(status_code=404, detail=f"Scanner report {report_id} not found")
+        
+        findings = s.query(models.ScannerFinding).filter(models.ScannerFinding.report_id == report_id).all()
+        finding_outs = []
+        for f in findings:
+            finding_outs.append(ScannerFindingOut(
+                id=f.id,
+                claim=f.claim,
+                quote=f.quote,
+                span_start=f.span_start,
+                span_end=f.span_end,
+                stance=f.stance,
+                evidence=f.evidence_json or {}
+            ))
+        
+        return ScannerReportOut(
+            id=report.id,
+            url=report.url,
+            status=report.status,
+            findings=finding_outs
+        )
+    finally:
+        s.close()
+
+
+@router.get("/api/scanner")
+def list_scanner_reports():
+    from backend.db.database import SessionLocal
+    s = SessionLocal()
+    try:
+        reports = s.query(models.ScannerReport).order_by(models.ScannerReport.id.desc()).limit(20).all()
+        return [
+            {
+                "id": r.id,
+                "url": r.url,
+                "status": r.status,
+                "created_at": r.created_at.isoformat() if hasattr(r, 'created_at') and r.created_at else None
+            }
+            for r in reports
+        ]
+    finally:
+        s.close()
+
+
 @router.get("/api/runs", response_model=RunsListResponse)
 def runs_list(db: Session = Depends(get_db)):
-    rows = db.query(models.Run).all()
-    if not rows:
-        return RunsListResponse(runs=load("runs_list.json")["runs"])
+    rows = db.query(models.Run).order_by(models.Run.created_at.desc()).all()
     return RunsListResponse(runs=[RunSummary(id=r.id, topic=r.topic, domain=r.domain, created_at=r.created_at, status=r.status) for r in rows])
 
 

@@ -162,14 +162,43 @@ class RunsListResponse(BaseModel):
 # ---------- evals ----------
 class EvalCase(BaseModel):
     id: str
+    description: Optional[str] = None
+    topic: Optional[str] = None
     kind: str
     passed: bool
     detail: Optional[str] = None
+    confidence: Optional[float] = None
+    found: List[str] = Field(default_factory=list)
+
+
+class EvalKindStats(BaseModel):
+    total: int
+    passed: int
+    accuracy: float
+
+
+class EvalSummary(BaseModel):
+    passed: int
+    total: int
+    accuracy: Optional[float] = None
+    precision: Optional[float] = None
+    recall: Optional[float] = None
+    f1_score: Optional[float] = None
+    avg_confidence: Optional[float] = None
+    by_kind: Optional[dict[str, EvalKindStats]] = None
+
+
+class EvalMetadata(BaseModel):
+    dataset_version: Optional[str] = None
+    last_run: Optional[str] = None
+    model_version: Optional[str] = None
+    test_environment: Optional[str] = None
 
 
 class EvalsResponse(BaseModel):
     cases: List[EvalCase] = Field(default_factory=list)
-    summary: dict[str, Any] = Field(default_factory=dict)
+    summary: EvalSummary
+    metadata: Optional[EvalMetadata] = None
 
 
 # ---------- health ----------

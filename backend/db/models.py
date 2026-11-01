@@ -78,8 +78,8 @@ class Finding(Base):
     id = Column(Integer, primary_key=True)
     run_id = Column(Integer, ForeignKey("runs.id"), nullable=False)
     slot_id = Column(Integer, ForeignKey("slots.id"))
-    kind = Column(String(16))  # GAP|CONFLICT|STALE
-    state = Column(String(64))  # 5 evidential states
+    kind = Column(String(16))  # GAP|CONFLICT|STALE|SYSTEM
+    state = Column(String(64))  # 5 evidential states + system states
     detail_json = Column(JSON)
 
     run = relationship("Run", back_populates="findings")
