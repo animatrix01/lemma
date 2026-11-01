@@ -7,6 +7,7 @@ from backend.mock_loader import load
 from backend.sse import bus
 from backend.ingest.pipeline import run_ingest
 from backend.config import settings
+from backend.llm_router import chat_with_intent
 from contracts.api_schema import *
 
 router = APIRouter()
@@ -26,6 +27,30 @@ def analyze(req: AnalyzeRequest, background_tasks: BackgroundTasks, db: Session 
     bus.get_queue(run.id)
     background_tasks.add_task(run_ingest, run.id, req.topic, req.question or "", req.domain or "", req.urls or [], req.attachments or [])
     return AnalyzeResponse(run_id=run.id, status="queued")
+
+
+@router.post("/api/chat", response_model=ChatResponse)
+def chat_endpoint(req: ChatRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    result = chat_with_intent(req.message)
+    if result["intent"] == "chat":
+        return ChatResponse(intent="chat", reply=result["reply"], research_query=None)
+
+    # intent == "research": start a lightweight run so the user gets verification inline.
+    topic = result["research_query"] or req.message
+    run = models.Run(topic=topic, domain="Education", question=topic, status="queued")
+    db.add(run)
+    db.commit()
+    db.refresh(run)
+    bus.get_queue(run.id)
+    background_tasks.add_task(
+        run_ingest, run.id, topic, topic, "Education", [], []
+    )
+    return ChatResponse(
+        intent="research",
+        reply=result["reply"],
+        research_query=result["research_query"],
+        run_id=run.id,
+    )
 
 
 @router.get("/api/runs/{run_id}/status")
@@ -155,8 +180,9 @@ def checklist_done(run_id: int, item_id: int):
 
 
 @router.post("/api/scanner")
-def scanner(req: ScannerRequest, background_tasks: BackgroundTasks):
+async def scanner(req: ScannerRequest):
     from backend.db.database import SessionLocal
+    from backend.scanner.run import get_q, run_scanner
     s = SessionLocal()
     try:
         report = models.ScannerReport(url=req.url, status="queued")
@@ -166,21 +192,41 @@ def scanner(req: ScannerRequest, background_tasks: BackgroundTasks):
         rid = report.id
     finally:
         s.close()
-    from backend.scanner.run import get_q, run_scanner
     get_q(rid)
-    background_tasks.add_task(run_scanner, rid, req.url)
+    asyncio.create_task(run_scanner(rid, req.url))
     return {"report_id": rid, "status": "queued"}
 
 
 @router.get("/api/scanner/{report_id}/status")
 async def scanner_status(report_id: int):
     from fastapi.responses import StreamingResponse
-    from backend.scanner.run import SCANNER_QUEUES
+    from backend.db.database import SessionLocal
+    from backend.scanner.run import SCANNER_EVENTS, get_q
+
     async def gen():
-        q = SCANNER_QUEUES.get(report_id)
-        if q is None:
-            from backend.scanner.run import get_q
-            q = get_q(report_id)
+        replayed_terminal = False
+        for item in list(SCANNER_EVENTS.get(report_id, [])):
+            yield f"data: {json.dumps(item)}\n\n"
+            if item.get("type") in ("scanner_done", "scanner_failed"):
+                replayed_terminal = True
+                break
+        if replayed_terminal:
+            return
+
+        s = SessionLocal()
+        try:
+            report = s.query(models.ScannerReport).filter(models.ScannerReport.id == report_id).first()
+            status = report.status if report else None
+        finally:
+            s.close()
+        if status == "done":
+            yield f"data: {json.dumps({'seq': 0, 'ts': None, 'type': 'scanner_done', 'payload': {'report_id': report_id}})}\n\n"
+            return
+        if status == "failed":
+            yield f"data: {json.dumps({'seq': 0, 'ts': None, 'type': 'scanner_failed', 'payload': {'error': 'Scan failed'}})}\n\n"
+            return
+
+        q = get_q(report_id)
         while True:
             try:
                 item = await asyncio.wait_for(q.get(), timeout=15)
@@ -192,7 +238,16 @@ async def scanner_status(report_id: int):
             yield f"data: {json.dumps(item)}\n\n"
             if item.get("type") in ("scanner_done", "scanner_failed"):
                 break
-    return StreamingResponse(gen(), media_type="text/event-stream")
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.get("/api/scanner/{report_id}", response_model=ScannerReportOut)
