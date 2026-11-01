@@ -10,6 +10,8 @@ import scannerReport from "@/mocks/scanner_report.json";
 import type {
   AnalyzeRequest,
   AnalyzeResponse,
+  ChatRequest,
+  ChatResponse,
   MatrixResponse,
   EvidenceDetailResponse,
   ChecklistItemOut,
@@ -83,6 +85,27 @@ export async function analyze(req: AnalyzeRequest): Promise<AnalyzeResponse> {
     if (error instanceof APIException) throw error;
     throw new APIException("Network error: Unable to connect to server");
   }
+}
+
+export async function chat(req: ChatRequest): Promise<ChatResponse> {
+  const response = await fetch(`${API_BASE}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!response.ok) {
+    let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+    let detail: string | undefined;
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.message || errorData.detail || errorMessage;
+      detail = errorData.detail;
+    } catch {
+      // Response body is not JSON, use status text
+    }
+    throw new APIException(errorMessage, response.status, detail);
+  }
+  return handleResponse<ChatResponse>(response);
 }
 
 export async function getMatrix(runId: number): Promise<MatrixResponse> {
@@ -175,6 +198,72 @@ export async function getEvals(): Promise<EvalsResponse> {
     if (error instanceof APIException) throw error;
     throw new APIException("Network error: Unable to fetch evals");
   }
+}
+
+export async function getScannerReportById(reportId: number): Promise<ScannerReportOut> {
+  if (MOCK_MODE) return scannerReport as ScannerReportOut;
+
+  try {
+    const response = await fetch(`${API_BASE}/api/scanner/${reportId}`);
+    return handleResponse<ScannerReportOut>(response);
+  } catch (error) {
+    if (error instanceof APIException) throw error;
+    throw new APIException("Network error: Unable to load scanner report");
+  }
+}
+
+export async function listScannerReports(): Promise<Array<{ id: number; url: string; status: string; created_at?: string }>> {
+  try {
+    const response = await fetch(`${API_BASE}/api/scanner`);
+    return handleResponse(response);
+  } catch (error) {
+    if (error instanceof APIException) throw error;
+    throw new APIException("Network error: Unable to load scan history");
+  }
+}
+
+export function streamScannerEvents(
+  reportId: number,
+  onEvent: (e: SSEEnvelope) => void,
+  onDone: () => void,
+  onError?: (error: Error) => void
+): () => void {
+  if (MOCK_MODE) {
+    onDone();
+    return () => {};
+  }
+
+  let isClosed = false;
+  const es = new EventSource(`${API_BASE}/api/scanner/${reportId}/status`);
+
+  es.onmessage = (msg) => {
+    if (isClosed) return;
+    try {
+      const data = JSON.parse(msg.data) as SSEEnvelope;
+      onEvent(data);
+      if (data.type === "scanner_done" || data.type === "scanner_failed") {
+        isClosed = true;
+        es.close();
+        onDone();
+      }
+    } catch (error) {
+      console.error("Failed to parse scanner SSE message:", error);
+    }
+  };
+
+  es.onerror = () => {
+    if (es.readyState === EventSource.CLOSED && !isClosed) {
+      isClosed = true;
+      if (onError) onError(new APIException("Scanner event stream closed"));
+    }
+  };
+
+  return () => {
+    if (!isClosed) {
+      isClosed = true;
+      es.close();
+    }
+  };
 }
 
 export async function getScannerReport(url: string): Promise<ScannerReportOut> {

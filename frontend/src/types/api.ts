@@ -41,6 +41,19 @@ export interface AnalyzeResponse {
   status: "queued";
 }
 
+// ---------- chat (lightweight conversational layer) ----------
+export interface ChatRequest {
+  message: string;
+  history: { role: string; content: string }[];
+}
+
+export interface ChatResponse {
+  intent: string; // "chat" | "research"
+  reply: string;
+  research_query?: string | null;
+  run_id?: number | null;
+}
+
 // ---------- sources ----------
 export interface SourceOut {
   id: number;
