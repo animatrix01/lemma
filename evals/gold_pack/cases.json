@@ -1,10 +1,82 @@
 [
-  {"id":"g1","url":"https://sites.google.com/aadusd.k12.ca.us/scholarship-opportunities","expected":["GAP"],"kind":"gap"},
-  {"id":"g2","url":"https://example.com","expected":["GAP"],"kind":"gap"},
-  {"id":"g3","url":"https://sites.google.com/aadusd.k12.ca.us/scholarship-opportunities","expected":["STALE"],"kind":"stale"},
-  {"id":"g4","url":"https://sites.google.com/aadusd.k12.ca.us/scholarship-opportunities","expected":["STALE"],"kind":"stale"},
-  {"id":"g5","url":"https://sites.google.com/aadusd.k12.ca.us/scholarship-opportunities","expected":["CONFLICT"],"kind":"conflict"},
-  {"id":"g6","url":"https://sites.google.com/aadusd.k12.ca.us/scholarship-opportunities","expected":["CONFLICT"],"kind":"conflict"},
-  {"id":"g7","url":"https://example.com","expected":[],"kind":"clean"},
-  {"id":"g8","url":"https://example.com","expected":[],"kind":"clean"}
+  {
+    "id": "gap-001",
+    "description": "Tech product comparison with missing battery specs",
+    "topic": "iPhone 15 Pro vs Samsung Galaxy S24 battery life",
+    "url": "https://www.apple.com/iphone-15-pro/specs/",
+    "expected": ["GAP"],
+    "kind": "gap"
+  },
+  {
+    "id": "gap-002", 
+    "description": "News article missing crucial source citation",
+    "topic": "Q3 GDP growth rate report verification",
+    "url": "https://example.com/news/gdp-report",
+    "expected": ["GAP"],
+    "kind": "gap"
+  },
+  {
+    "id": "stale-001",
+    "description": "Outdated product recall information on manufacturer site",
+    "topic": "2024 vehicle safety recall notices",
+    "url": "https://example.com/recalls/vehicles",
+    "expected": ["STALE"],
+    "kind": "stale"
+  },
+  {
+    "id": "stale-002",
+    "description": "Hotel cancellation policy not updated after policy change",
+    "topic": "Booking.com vs hotel website cancellation terms",
+    "url": "https://example.com/hotel/policies",
+    "expected": ["STALE"],
+    "kind": "stale"
+  },
+  {
+    "id": "conflict-001",
+    "description": "CEO interview contradicts earnings report figures",
+    "topic": "Tech Corp Q3 2024 revenue statements",
+    "url": "https://example.com/earnings/tech-corp-q3",
+    "expected": ["CONFLICT"],
+    "kind": "conflict"
+  },
+  {
+    "id": "conflict-002",
+    "description": "Software license terms differ between vendor and app store",
+    "topic": "Adobe Creative Suite enterprise licensing",
+    "url": "https://example.com/licenses/adobe",
+    "expected": ["CONFLICT"],
+    "kind": "conflict"
+  },
+  {
+    "id": "conflict-003",
+    "description": "Climate study claims vs peer review findings",
+    "topic": "2024 Arctic ice melt rate analysis",
+    "url": "https://example.com/research/climate-2024",
+    "expected": ["CONFLICT"],
+    "kind": "conflict"
+  },
+  {
+    "id": "clean-001",
+    "description": "Consistent product specifications across all sources",
+    "topic": "MacBook Pro M3 technical specifications",
+    "url": "https://www.apple.com/macbook-pro/specs/",
+    "expected": [],
+    "kind": "clean"
+  },
+  {
+    "id": "clean-002",
+    "description": "Aligned financial data across multiple reports",
+    "topic": "Microsoft Q2 2024 earnings verification",
+    "url": "https://example.com/microsoft-earnings",
+    "expected": [],
+    "kind": "clean"
+  },
+  {
+    "id": "multi-001",
+    "description": "Multiple issues: outdated data and missing citations",
+    "topic": "COVID-19 vaccination rates by region",
+    "url": "https://example.com/covid-stats",
+    "expected": ["GAP", "STALE"],
+    "kind": "multi"
+  }
 ]

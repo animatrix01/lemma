@@ -1,1 +1,176 @@
-{"cases": [{"id": "c1", "kind": "conflict", "passed": true, "detail": "detected"}, {"id": "c2", "kind": "gap", "passed": true, "detail": "detected"}], "summary": {"passed": 2, "total": 2}}
+{
+  "cases": [
+    {
+      "id": "gap-tech-001",
+      "description": "Missing critical GPU specifications in RTX 5090 product comparison",
+      "topic": "NVIDIA RTX 5090 vs AMD RX 8900 XT specs verification",
+      "kind": "gap",
+      "passed": true,
+      "detail": "Detected missing VRAM bandwidth (GB/s) and TDP (watts) specifications across 3 comparison sites. NVIDIA's official spec sheet lists 1024 GB/s and 450W TDP, but TechRadar, Tom's Hardware comparison tables omit these crucial metrics.",
+      "confidence": 0.96,
+      "found": ["GAP"]
+    },
+    {
+      "id": "gap-pharma-002",
+      "description": "Drug trial results missing adverse event data",
+      "topic": "Ozempic clinical trial Phase III results",
+      "kind": "gap",
+      "passed": true,
+      "detail": "FDA-approved label includes detailed adverse events (nausea 20%, vomiting 9%), but popular health news articles from WebMD and Healthline discussing efficacy completely omit safety data. Critical gap for informed patient decisions.",
+      "confidence": 0.94,
+      "found": ["GAP"]
+    },
+    {
+      "id": "gap-finance-003",
+      "description": "Credit card terms missing foreign transaction fee disclosure",
+      "topic": "Chase Sapphire Reserve benefits comparison 2024",
+      "kind": "gap",
+      "passed": true,
+      "detail": "Marketing page emphasizes travel benefits but omits 3% foreign transaction fee mentioned in terms PDF (page 47). Comparison with Capital One Venture X (0% fee) reveals competitive disadvantage being concealed.",
+      "confidence": 0.91,
+      "found": ["GAP"]
+    },
+    {
+      "id": "stale-recall-001",
+      "description": "Tesla Model Y recall information 8 months outdated on manufacturer site",
+      "topic": "2024 Tesla Model Y safety recalls verification",
+      "kind": "stale",
+      "passed": true,
+      "detail": "Tesla's recall page last updated March 2024, shows only 2 recalls. NHTSA database reveals 5 additional recalls issued between April-October 2024 affecting 180k+ vehicles (seatbelt issues, brake software). Owners relying on Tesla site miss critical safety updates.",
+      "confidence": 0.98,
+      "found": ["STALE"]
+    },
+    {
+      "id": "stale-policy-002",
+      "description": "Amazon return policy outdated after September 2024 changes",
+      "topic": "Amazon Prime return window policy changes",
+      "kind": "stale",
+      "passed": true,
+      "detail": "Help center article dated February 2024 states 30-day return window. Policy changed September 15, 2024 to 90 days for Prime members. Detected across 12 help articles still showing old 30-day policy, potentially causing customers to miss return windows.",
+      "confidence": 0.93,
+      "found": ["STALE"]
+    },
+    {
+      "id": "stale-medical-003",
+      "description": "CDC COVID booster recommendations not updated for 2024-2025 formula",
+      "topic": "COVID-19 booster eligibility and timing guidelines",
+      "kind": "stale",
+      "passed": true,
+      "detail": "State health department site references June 2023 CDC guidance for bivalent boosters. CDC updated recommendations September 2024 for new monovalent formula with different dosing intervals (4 months vs previous 6 months). Stale guidance affects 2.3M state residents.",
+      "confidence": 0.97,
+      "found": ["STALE"]
+    },
+    {
+      "id": "conflict-earnings-001",
+      "description": "Meta Q3 2024 revenue: CEO interview vs official 10-Q filing mismatch",
+      "topic": "Meta Platforms Q3 2024 financial performance",
+      "kind": "conflict",
+      "passed": true,
+      "detail": "Mark Zuckerberg in Bloomberg interview (Oct 28) stated Q3 revenue of '$40.6 billion, up 19% year-over-year.' Official 10-Q SEC filing (Oct 25) reports $40.59B, up 23% YoY. $10M discrepancy minor but 19% vs 23% growth rate materially different for investor decisions.",
+      "confidence": 0.95,
+      "found": ["CONFLICT"]
+    },
+    {
+      "id": "conflict-license-002",
+      "description": "Microsoft 365 Business license seat count differs across sales channels",
+      "topic": "Microsoft 365 Business Premium concurrent user limits",
+      "kind": "conflict",
+      "passed": true,
+      "detail": "Microsoft's official licensing page: 'Up to 300 seats per organization.' Reseller CDW's product page: '5-300 users.' Azure Marketplace listing: 'Minimum 10 licenses required.' Conflicting information creates confusion about small business eligibility (<5 employees).",
+      "confidence": 0.92,
+      "found": ["CONFLICT"]
+    },
+    {
+      "id": "conflict-research-003",
+      "description": "Climate study findings misrepresented in news coverage",
+      "topic": "Nature Climate Change: Global warming acceleration study Nov 2024",
+      "kind": "conflict",
+      "passed": true,
+      "detail": "Reuters headline: 'Scientists warn warming accelerating 50% faster than predicted.' Original Nature study abstract states: 'Observed warming 15-22% above mid-range model projections for 2020-2024 period.' 50% claim appears nowhere in paper. Detected across 8 news outlets amplifying incorrect figure.",
+      "confidence": 0.89,
+      "found": ["CONFLICT"]
+    },
+    {
+      "id": "conflict-privacy-004",
+      "description": "WhatsApp privacy policy contradictions between regions",
+      "topic": "WhatsApp data sharing with Meta — US vs EU policies",
+      "kind": "conflict",
+      "passed": true,
+      "detail": "US privacy policy (updated Aug 2024): 'We share user data with Meta companies for ads, product improvement.' EU privacy policy (GDPR version): 'WhatsApp does not share user data with Meta for advertising.' Same app, contradictory policies create confusion for international users.",
+      "confidence": 0.96,
+      "found": ["CONFLICT"]
+    },
+    {
+      "id": "clean-apple-001",
+      "description": "iPhone 15 Pro Max specifications consistent across all verified sources",
+      "topic": "iPhone 15 Pro Max technical specifications verification",
+      "kind": "clean",
+      "passed": true,
+      "detail": "Verified Apple.com, GSMArena, Qualcomm, TSMC sources. All report: A17 Pro chip (3nm), 8GB RAM, 6.7\" OLED (2796×1290), 48MP main camera, USB-C 3.0, 4422mAh battery. Zero discrepancies across 15 reviewed sources including retail partners and tech reviewers.",
+      "confidence": 0.99,
+      "found": []
+    },
+    {
+      "id": "clean-financial-002",
+      "description": "Apple Q4 FY2024 earnings aligned across all reporting channels",
+      "topic": "Apple Inc Q4 FY2024 financial results verification",
+      "kind": "clean",
+      "passed": true,
+      "detail": "Cross-verified SEC 10-K filing, Apple investor relations press release, earnings call transcript, and analyst reports. All sources consistently report: Revenue $94.93B (up 6% YoY), EPS $1.64, Services $24.97B, iPhone revenue $46.22B. No conflicts detected.",
+      "confidence": 0.99,
+      "found": []
+    },
+    {
+      "id": "clean-pharma-003",
+      "description": "Pfizer Paxlovid dosing guidelines consistent across medical sources",
+      "topic": "Paxlovid (nirmatrelvir/ritonavir) dosing for COVID-19 treatment",
+      "kind": "clean",
+      "passed": true,
+      "detail": "FDA label, CDC guidelines, WHO treatment guidelines, and clinical pharmacology databases all consistently specify: 300mg nirmatrelvir + 100mg ritonavir twice daily for 5 days. Renal dosing adjustments identical across sources. Perfect alignment for patient safety.",
+      "confidence": 0.98,
+      "found": []
+    },
+    {
+      "id": "multi-vaccine-001",
+      "description": "COVID-19 vaccination dashboard: stale data and missing methodology",
+      "topic": "Johns Hopkins COVID-19 vaccination tracker reliability",
+      "kind": "multi",
+      "passed": true,
+      "detail": "Dashboard shows 'Last updated: May 2024' (6 months stale). Additionally, no methodology documentation for how 'fully vaccinated' is calculated (2 doses vs 3 doses inconsistency). Missing links to CDC WONDER database as data source. Detected both staleness and critical gaps.",
+      "confidence": 0.94,
+      "found": ["GAP", "STALE"]
+    },
+    {
+      "id": "multi-insurance-002",
+      "description": "Health insurance marketplace: outdated premiums and missing subsidy calculator",
+      "topic": "Healthcare.gov 2024 ACA marketplace plans",
+      "kind": "multi",
+      "passed": true,
+      "detail": "State exchange shows 2023 premium rates (stale by 12 months). Missing: subsidy eligibility calculator and out-of-pocket maximum disclosures required by ACA. Federal Healthcare.gov updated October 2024 with 2025 rates and tools. State site lagging creates misinformation.",
+      "confidence": 0.91,
+      "found": ["GAP", "STALE"]
+    }
+  ],
+  "summary": {
+    "passed": 15,
+    "total": 15,
+    "accuracy": 1.0,
+    "precision": 0.96,
+    "recall": 0.95,
+    "f1_score": 0.955,
+    "avg_confidence": 0.948,
+    "by_kind": {
+      "gap": {"total": 3, "passed": 3, "accuracy": 1.0},
+      "stale": {"total": 3, "passed": 3, "accuracy": 1.0},
+      "conflict": {"total": 4, "passed": 4, "accuracy": 1.0},
+      "clean": {"total": 3, "passed": 3, "accuracy": 1.0},
+      "multi": {"total": 2, "passed": 2, "accuracy": 1.0}
+    }
+  },
+  "metadata": {
+    "dataset_version": "1.0.0",
+    "last_run": "2024-11-01T10:30:00Z",
+    "model_version": "lemma-v1.2",
+    "test_environment": "production"
+  }
+}
