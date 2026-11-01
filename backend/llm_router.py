@@ -1,8 +1,8 @@
 import os
 from backend.config import settings
 
-GROQ_MODEL = "openai/gpt-oss-120b"
-GEMINI_MODEL = "gemini-2.5-flash"
+GROQ_MODEL = "qwen/qwen3.8-27b"
+GEMINI_MODEL = "gemini-2.0-flash-exp"
 
 
 def _groq_client():
@@ -14,7 +14,12 @@ def chat(messages, temperature=0, json_mode=False, vision_image=None):
     # primary groq
     try:
         client = _groq_client()
-        kwargs = {"model": GROQ_MODEL, "messages": messages, "temperature": temperature}
+        kwargs = {
+            "model": GROQ_MODEL, 
+            "messages": messages, 
+            "temperature": temperature,
+            "max_tokens": 800  # Limit tokens to avoid rate limits
+        }
         r = client.chat.completions.create(**kwargs)
         return r.choices[0].message.content
     except Exception as e:

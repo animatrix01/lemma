@@ -22,7 +22,45 @@ def run_analysis(run_id: int):
         claims = db.query(models.Claim).filter(models.Claim.run_id == run_id).all()
         slots = db.query(models.Slot).filter(models.Slot.run_id == run_id).all()
         slot_map = {s.id: s for s in slots}
+        
+        # Only consider core slots for gap analysis
         core_slots = [s for s in slots if s.is_core]
+
+        findings_created = []
+        
+        # Handle the case of zero claims extracted
+        if len(claims) == 0:
+            bus.emit(run_id, "analysis_warning", {
+                "type": "insufficient_extraction",
+                "message": "No claims extracted from sources",
+                "sources_reviewed": len(sources)
+            })
+            # Do NOT create gap findings when extraction failed
+            # Create a single system finding to indicate the issue
+            finding = models.Finding(
+                run_id=run_id,
+                slot_id=None,
+                kind="SYSTEM",
+                state="Insufficient evidence",
+                detail_json={
+                    "reason": "extraction_failure",
+                    "sources_reviewed": len(sources),
+                    "usable_sources": 0,
+                    "claims_extracted": 0,
+                    "message": "No usable claims could be extracted. Requirements cannot be assessed reliably."
+                }
+            )
+            db.add(finding)
+            db.commit()
+            db.refresh(finding)
+            findings_created.append(finding)
+            
+            # Update run status and exit early
+            run.status = "analyzed"
+            db.commit()
+            bus.emit(run_id, "finding_finalized", {"kind": "SYSTEM", "state": "Insufficient evidence"})
+            bus.emit(run_id, "run_done", {"status": "analyzed"})
+            return
 
         # conflicts
         # group claims by slot
@@ -30,7 +68,6 @@ def run_analysis(run_id: int):
         for c in claims:
             by_slot.setdefault(c.slot_id, []).append(c)
 
-        findings_created = []
         for slot_id, cs in by_slot.items():
             # deterministic: same slot+normalized field differing values
             field_groups = {}
@@ -83,9 +120,14 @@ def run_analysis(run_id: int):
                             bus.emit(run_id, "conflict_found", {"slot_key": slot_map[slot_id].key, "values": [va, vb], "method": "llm", "verdict": "possible"})
 
         # gaps: core slots with zero mapped claims
+        # Only perform gap analysis if we successfully extracted claims
+        # This ensures we don't create false gaps when extraction failed
         mapped_slot_ids = {c.slot_id for c in claims if c.slot_id}
         from backend.ingest.gather import gather_sources
         from backend.ingest.fetch import fetch_one
+        
+        # Only probe for gaps in core slots that have no claims
+        # and only if we successfully extracted some claims overall
         for s in core_slots:
             if s.id in mapped_slot_ids:
                 continue
@@ -95,7 +137,17 @@ def run_analysis(run_id: int):
                 q = f"{run.topic} {s.key} {s.label}"
                 bus.emit(run_id, "gap_probe", {"slot_key": s.key, "attempt": attempt + 1, "query": q, "outcome": "searching"})
                 outcomes.append("no results")
-            finding = models.Finding(run_id=run_id, slot_id=s.id, kind="GAP", state="Not found in reviewed sources", detail_json={"probes": settings.TAVILY_MAX_GAP_PROBES, "sources_checked": len(sources)})
+            finding = models.Finding(
+                run_id=run_id,
+                slot_id=s.id,
+                kind="GAP",
+                state="Not found in reviewed sources",
+                detail_json={
+                    "probes": settings.TAVILY_MAX_GAP_PROBES,
+                    "sources_checked": len(sources),
+                    "claims_extracted": len(claims)
+                }
+            )
             db.add(finding)
             db.commit()
             db.refresh(finding)
@@ -136,9 +188,11 @@ def run_analysis(run_id: int):
                 prompt = f"Verify {slot_key} at official source"
             elif f.kind == "CONFLICT":
                 prompt = f"Which value is current for {slot_key}?"
+            elif f.kind == "SYSTEM":
+                prompt = "Review source quality and try additional sources"
             else:
                 prompt = f"Re-confirm date at source for {slot_key}"
-            db.add(models.ChecklistItem(run_id=run_id, finding_id=f.id, prompt=prompt, target_hint="official portal", done=False))
+            db.add(models.ChecklistItem(run_id=run_id, finding_id=f.id, prompt=prompt, target_hint="official portal" if f.kind != "SYSTEM" else None, done=False))
         db.commit()
 
         # update run status
@@ -147,6 +201,7 @@ def run_analysis(run_id: int):
     finally:
         db.close()
     bus.emit(run_id, "finding_finalized", {"kind": "ANALYSIS", "state": "done"})
+    bus.emit(run_id, "run_done", {"status": "analyzed"})
 
 
 def _llm_judge(q1, q2, slot_key):
