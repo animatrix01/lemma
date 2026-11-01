@@ -28,19 +28,6 @@ def emit_scanner(report_id, etype, payload):
 
 async def run_scanner(report_id: int, url: str):
     get_q(report_id)
-    # fetch
-    res = await fetch_one(url)
-    text = res.get("text") or ""
-    claims = extract_claims_from_source(text)
-    # check-worthiness: sort by length/numbers; cap
-    def weight(c):
-        t = c.get("claim_text", "")
-        score = len(t)
-        if any(ch.isdigit() for ch in t):
-            score += 50
-        return score
-    claims_sorted = sorted(claims, key=weight, reverse=True)[:settings.TAVILY_MAX_SCANNER_CLAIM_CHECKS]
-
     db = SessionLocal()
     try:
         report = db.query(models.ScannerReport).filter(models.ScannerReport.id == report_id).first()
@@ -49,6 +36,65 @@ async def run_scanner(report_id: int, url: str):
             db.commit()
     finally:
         db.close()
+    
+    # fetch
+    try:
+        res = await fetch_one(url)
+    except Exception as e:
+        db = SessionLocal()
+        try:
+            report = db.query(models.ScannerReport).filter(models.ScannerReport.id == report_id).first()
+            if report:
+                report.status = "failed"
+                db.commit()
+        finally:
+            db.close()
+        emit_scanner(report_id, "scanner_failed", {"error": f"Failed to fetch URL: {str(e)}"})
+        SCANNER_QUEUES.pop(report_id, None)
+        return
+    
+    text = res.get("text") or ""
+    
+    # Check if we actually got content
+    if len(text.strip()) < 100:
+        db = SessionLocal()
+        try:
+            report = db.query(models.ScannerReport).filter(models.ScannerReport.id == report_id).first()
+            if report:
+                report.status = "failed"
+                db.commit()
+        finally:
+            db.close()
+        emit_scanner(report_id, "scanner_failed", {"error": "Could not extract article content. The page may be behind a paywall or require JavaScript."})
+        SCANNER_QUEUES.pop(report_id, None)
+        return
+    
+    emit_scanner(report_id, "scanner_claim_extracted", {"message": f"Extracted {len(text)} characters from article"})
+    
+    claims = extract_claims_from_source(text)
+    
+    # Check if claims were extracted
+    if not claims:
+        db = SessionLocal()
+        try:
+            report = db.query(models.ScannerReport).filter(models.ScannerReport.id == report_id).first()
+            if report:
+                report.status = "done"
+                db.commit()
+        finally:
+            db.close()
+        emit_scanner(report_id, "scanner_done", {"report_id": report_id, "message": "No factual claims found in article"})
+        SCANNER_QUEUES.pop(report_id, None)
+        return
+    
+    # check-worthiness: sort by length/numbers; cap
+    def weight(c):
+        t = c.get("claim_text", "")
+        score = len(t)
+        if any(ch.isdigit() for ch in t):
+            score += 50
+        return score
+    claims_sorted = sorted(claims, key=weight, reverse=True)[:settings.TAVILY_MAX_SCANNER_CLAIM_CHECKS]
 
     client = TavilyClient(api_key=settings.TAVILY_API_KEY)
     findings = []
@@ -79,7 +125,7 @@ async def run_scanner(report_id: int, url: str):
                 span_start=c.get("span_start"),
                 span_end=c.get("span_end"),
                 stance=stance,
-                evidence_json={"counter_text": counter_text[:500], "url": counter_url},
+                evidence_json={"counter_quote": counter_text[:500] if counter_text else None, "url": counter_url, "searches": len(results)},
             )
             db.add(sf)
             db.commit()

@@ -40,7 +40,7 @@ async def fetch_one(url: str) -> dict:
     last_err = None
     for _ in range(2):
         try:
-            async with httpx.AsyncClient(timeout=20, follow_redirects=True, headers={"User-Agent": "Mozilla/5.0"}) as client:
+            async with httpx.AsyncClient(timeout=15, follow_redirects=True, headers={"User-Agent": "Mozilla/5.0"}) as client:
                 r = await client.get(url)
                 r.raise_for_status()
                 ctype = r.headers.get("content-type", "")

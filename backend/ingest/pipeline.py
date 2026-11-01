@@ -10,7 +10,11 @@ from backend.engine.mapping import prefilter_slots, finalize_mapping
 from backend.engine.analysis import run_analysis
 
 
-async def run_ingest(run_id: int, topic: str, question: str, domain: str, urls: list[str], attachments: list[str]):
+def run_ingest(run_id: int, topic: str, question: str, domain: str, urls: list[str], attachments: list[str]):
+    asyncio.run(_run_ingest_async(run_id, topic, question, domain, urls, attachments))
+
+
+async def _run_ingest_async(run_id: int, topic: str, question: str, domain: str, urls: list[str], attachments: list[str]):
     bus.get_queue(run_id)
     db = SessionLocal()
     try:
@@ -64,14 +68,18 @@ async def run_ingest(run_id: int, topic: str, question: str, domain: str, urls: 
 
     bus.emit(run_id, "stage_done", {"stage": "Ingest"})
 
-    # Phase 2: slots
-    existing = seeded_slots()
+    # Phase 2: slots - generate query-specific requirements
+    existing = seeded_slots(topic=topic, domain=domain, question=question)
+    bus.emit(run_id, "slot_generation", {"method": "query_specific", "count": len(existing)})
+    
     try:
-        extra = extend_slots(topic, [s["key"] for s in existing])
+        extra = extend_slots(topic, question, [s["key"] for s in existing])
         for s in extra:
             existing.append({"key": s["key"], "label": s.get("label", s["key"]), "definition": s.get("definition", ""), "is_core": False})
-    except Exception:
-        pass
+        if extra:
+            bus.emit(run_id, "slot_extension", {"count": len(extra)})
+    except Exception as e:
+        bus.emit(run_id, "slot_extension", {"error": str(e)})
     db = SessionLocal()
     try:
         slot_rows = {}
@@ -89,33 +97,40 @@ async def run_ingest(run_id: int, topic: str, question: str, domain: str, urls: 
     total_claims = 0
     slot_counts = {s["key"]: 0 for s in existing}
     for source_id, text in source_ids:
-        claims = extract_claims_from_source(text)
-        for c in claims:
-            # prefilter + finalize
-            cand = prefilter_slots(c.get("claim_text", ""), existing, top_k=6)
-            slot_key = finalize_mapping(c.get("claim_text", ""), cand, existing)
-            slot_id = slot_rows.get(slot_key) if slot_key else None
-            db = SessionLocal()
-            try:
-                claim = models.Claim(
-                    run_id=run_id,
-                    source_id=source_id,
-                    quote=c.get("quote", ""),
-                    span_start=c.get("span_start"),
-                    span_end=c.get("span_end"),
-                    slot_id=slot_id,
-                    normalized_value_json=c.get("normalized_value"),
-                    type=c.get("type"),
-                    claim_date=c.get("claim_date"),
-                )
-                db.add(claim)
-                db.commit()
-            finally:
-                db.close()
-            total_claims += 1
-            if slot_key:
-                slot_counts[slot_key] = slot_counts.get(slot_key, 0) + 1
-        bus.emit(run_id, "claim_extracted", {"source_id": source_id, "count_total": total_claims, "samples": [cl.get("quote", "") for cl in claims[:2]]})
+        try:
+            # Limit text size to prevent timeouts
+            if len(text) > 50000:
+                text = text[:50000]
+            claims = extract_claims_from_source(text)
+            for c in claims:
+                # prefilter + finalize
+                cand = prefilter_slots(c.get("claim_text", ""), existing, top_k=6)
+                slot_key = finalize_mapping(c.get("claim_text", ""), cand, existing)
+                slot_id = slot_rows.get(slot_key) if slot_key else None
+                db = SessionLocal()
+                try:
+                    claim = models.Claim(
+                        run_id=run_id,
+                        source_id=source_id,
+                        quote=c.get("quote", ""),
+                        span_start=c.get("span_start"),
+                        span_end=c.get("span_end"),
+                        slot_id=slot_id,
+                        normalized_value_json=c.get("normalized_value"),
+                        type=c.get("type"),
+                        claim_date=c.get("claim_date"),
+                    )
+                    db.add(claim)
+                    db.commit()
+                finally:
+                    db.close()
+                total_claims += 1
+                if slot_key:
+                    slot_counts[slot_key] = slot_counts.get(slot_key, 0) + 1
+            bus.emit(run_id, "claim_extracted", {"source_id": source_id, "count_total": total_claims, "samples": [cl.get("quote", "") for cl in claims[:2]]})
+        except Exception as e:
+            # Log error but continue processing other sources
+            bus.emit(run_id, "claim_extracted", {"source_id": source_id, "count_total": total_claims, "error": str(e)})
 
     for key, cnt in slot_counts.items():
         bus.emit(run_id, "mapping_progress", {"slot_key": key, "mapped_count": cnt})
