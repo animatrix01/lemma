@@ -83,7 +83,7 @@
 }
 
 .dark {
-  --background: oklch(0.269 0 0);
+  --background: #0d0908;
   --foreground: oklch(0.985 0 0);
   --card: #30302E;
   --card-foreground: oklch(0.985 0 0);
@@ -137,6 +137,18 @@
   input, textarea {
     cursor: text !important;
     caret-color: currentColor !important;
+  }
+  
+  /* Hide textarea scrollbars completely */
+  textarea {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+  
+  textarea::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
   }
 
   /* Hide scrollbar but keep functionality */

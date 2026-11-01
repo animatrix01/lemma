@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -7,10 +7,18 @@ import { analyze, APIException, streamEvents } from "@/lib/api";
 import { ClaudeChatInput } from "@/components/ui/claude-chat-input";
 import { RunFeed } from "@/components/run-feed";
 import { AppShell } from "@/components/app-shell";
-import { LemmaLogo } from "@/components/lemma-logo";
+import { Playfair_Display } from "next/font/google";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { AnalyzeRequest, SSEEnvelope } from "@/types/api";
+
+const playfairDisplay = Playfair_Display({
+    weight: ["700"],
+    subsets: ["latin"],
+    style: ["italic"],
+    variable: "--font-playfair",
+    display: "swap",
+});
 
 interface SentFile {
     id: string;
@@ -33,7 +41,7 @@ const EXAMPLES = [
 const QUICK_ACTIONS = [
     {
         label: "Analyze Policy",
-        topic: "Analyze this policy for information gaps",
+        template: "Analyze the following policy document for information gaps, inconsistencies, and missing data:\n\n[Paste policy name or document here]\n\nPlease identify:\n- Missing eligibility criteria\n- Unclear terms and conditions\n- Contradictory statements\n- Important dates or deadlines that are not specified",
         icon: (
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
@@ -42,7 +50,7 @@ const QUICK_ACTIONS = [
     },
     {
         label: "Check Benefits",
-        topic: "Check the benefits I am eligible for",
+        template: "Compare the benefits and eligibility requirements across these programs:\n\n[Program 1: URL or name]\n[Program 2: URL or name]\n[Program 3: URL or name]\n\nHelp me identify:\n- Which programs I'm eligible for\n- Key differences in benefits\n- Application requirements\n- Important deadlines",
         icon: (
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c0 2.5 6 2.5 6 2.5s6 0 6-2.5v-5" />
@@ -51,7 +59,7 @@ const QUICK_ACTIONS = [
     },
     {
         label: "Verify Documents",
-        topic: "Verify the claims in this document",
+        template: "Verify the claims and facts in the following document:\n\n[URL or paste document content here]\n\nCross-reference with trusted sources and identify:\n- Factual inaccuracies\n- Unsupported claims\n- Outdated information\n- Missing citations or sources",
         icon: (
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18" />
@@ -71,6 +79,7 @@ export default function DashboardPage() {
     const [shouldRedirect, setShouldRedirect] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [promptTemplate, setPromptTemplate] = useState<string>("");
 
     // Check auth
     useEffect(() => {
@@ -181,20 +190,19 @@ export default function DashboardPage() {
         model: string;
         isThinkingEnabled: boolean;
     }) {
-        await startAnalysis(data.message, data.files, data.pastedContent);
+        const text = (data.message || "").trim();
+        if (!text) return;
+        const id = "session_" + Date.now();
+        // Stash the opening message so the chat page can send it on mount.
+        try {
+            sessionStorage.setItem(`lemma_chat_${id}`, text);
+        } catch {}
+        router.push(`/c/${id}`);
     }
 
     const inRun = activeRunId !== null;
 
-    if (isLoading) {
-        return (
-            <div className="h-screen w-screen flex items-center justify-center bg-background">
-                <LemmaLogo className="w-16 h-16 text-[#FACC15] animate-pulse" />
-            </div>
-        );
-    }
-
-    if (!isAuthenticated) {
+    if (!isAuthenticated && !isLoading) {
         return null;
     }
 
@@ -229,7 +237,7 @@ export default function DashboardPage() {
                                         href={`/runs/${activeRunId}`}
                                         className={cn(buttonVariants({ size: "lg" }), "shadow-md animate-in fade-in-0 zoom-in-95 duration-300")}
                                     >
-                                        View Full Report →
+                                        View Full Report â†’
                                     </Link>
                                 </div>
                             )}
@@ -241,36 +249,35 @@ export default function DashboardPage() {
                 </div>
             ) : (
                 <div className="relative h-full overflow-hidden bg-[#0d0908]">
-                    <div className="relative isolate flex flex-col items-center justify-center px-6 h-full">
+                    <div className="relative isolate flex flex-col items-center justify-center px-6 h-full pb-[7rem]">
                         {/* Banner background image + scrims */}
                         <img
                             src="/images/hero-bg.jpg"
                             alt=""
-                            className="w-full h-full object-cover absolute top-0 right-0 bottom-0 left-0 [filter:brightness(1.04)_contrast(1.03)]"
+                            className="w-full h-full object-cover absolute top-0 right-0 bottom-0 left-0 [filter:brightness(0.85)_contrast(1.03)] opacity-70"
                         />
-                        <div className="absolute inset-0 bg-black/20" />
+                        <div className="absolute inset-0 bg-black/30" />
                         <div className="pointer-events-none absolute inset-0 ring-1 ring-black/30" />
-                        <div className="absolute left-0 top-0 h-[280px] w-[46%] bg-[radial-gradient(ellipse_at_0%_0%,rgba(0,0,0,0.35),transparent_72%)]" />
-                        <div className="absolute right-0 top-0 h-[280px] w-[46%] bg-[radial-gradient(ellipse_at_100%_0%,rgba(0,0,0,0.35),transparent_72%)]" />
-                        <div className="absolute bottom-0 left-0 right-0 h-56 bg-[linear-gradient(to_top,rgba(38,38,38,0.9),transparent)]" />
+                        <div className="absolute left-0 top-0 h-[280px] w-[46%] bg-[radial-gradient(ellipse_at_0%_0%,rgba(0,0,0,0.8),transparent_72%)]" />
+                        <div className="absolute right-0 top-0 h-[280px] w-[46%] bg-[radial-gradient(ellipse_at_100%_0%,rgba(0,0,0,0.8),transparent_72%)]" />
+                        <div className="absolute bottom-0 left-0 right-0 h-56 bg-[linear-gradient(to_top,rgba(38,38,38,0.97),transparent)]" />
                         <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.04)_1px,transparent_1px)] [background-size:6px_6px]" />
 
                         <div className="z-10 relative w-full max-w-3xl text-center">
-                            {/* Badge pill */}
-                            <div className="mb-6 inline-flex items-center gap-3 rounded-full bg-white/10 px-2.5 py-2 ring-1 ring-white/15 backdrop-blur animate-fade-slide-in-1">
-                                <LemmaLogo className="w-4 h-4 text-[#FACC15]" />
-                                <span className="text-sm font-medium text-white/90">
-                                    Welcome back, <span className="text-white">Guest</span>
-                                </span>
+                            {/* Welcome text */}
+                            <div className="mb-2 mt-0">
+                                <p className="text-2xl sm:text-3xl text-white/90 font-semibold tracking-tight">
+                                    Welcome back, Guest
+                                </p>
                             </div>
 
-                            <h1 className="sm:text-5xl md:text-6xl lg:text-7xl leading-tight text-4xl text-white tracking-tight font-normal animate-fade-slide-in-2">
-                                Detect information gaps
-                                <br className="hidden sm:block" />
-                                before they mislead
+                            <h1 className="mt-20 sm:text-5xl md:text-6xl lg:text-7xl leading-tight text-4xl text-white tracking-tight font-bold animate-fade-slide-in-2">
+                                Ask anything.
+                                <br />
+                                We'll find the truth.
                             </h1>
 
-                            <p className="sm:text-lg animate-fade-slide-in-3 text-base text-white/80 max-w-2xl mt-6 mx-auto">
+                            <p className="sm:text-xl animate-fade-slide-in-3 text-lg text-white/85 max-w-2xl mt-6 mx-auto font-medium">
                                 Verify claims, catch contradictions, find missing data
                             </p>
 
@@ -280,18 +287,21 @@ export default function DashboardPage() {
                                 </div>
                             )}
 
-                            {/* Prompt box — banner CTA slot */}
-                            <div className="animate-fade-slide-in-4 w-full max-w-2xl mx-auto mt-10">
-                                <ClaudeChatInput onSendMessage={handleSendMessage} />
+                            {/* Prompt box â€” banner CTA slot */}
+                            <div className="animate-fade-slide-in-4 w-full max-w-3xl mx-auto mt-[8.25rem]">
+                                <ClaudeChatInput 
+                                    onSendMessage={handleSendMessage}
+                                    initialMessage={promptTemplate}
+                                />
                             </div>
 
                             {/* Quick actions */}
-                            <div className="flex flex-wrap justify-center gap-2 mt-8 max-w-2xl mx-auto">
+                            <div className="flex flex-wrap justify-center gap-3 mt-6 max-w-2xl mx-auto">
                                 {QUICK_ACTIONS.map((action) => (
                                     <button
                                         key={action.label}
                                         disabled={sending}
-                                        onClick={() => startAnalysis(action.topic)}
+                                        onClick={() => setPromptTemplate(action.template)}
                                         className="inline-flex items-center gap-2 px-4 py-2 text-sm text-white/90 bg-white/10 border border-white/10 rounded-full backdrop-blur-sm hover:bg-white/15 hover:text-white transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none"
                                     >
                                         {action.icon}
