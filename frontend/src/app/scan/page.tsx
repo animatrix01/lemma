@@ -267,8 +267,8 @@ export default function ScanPage() {
   if (!report && !loading) {
     return (
       <AppShell>
-        <div className="relative h-full overflow-hidden bg-[#0d0908]">
-          <div className="relative isolate flex flex-col items-center justify-center px-6 h-full">
+        <div className="relative h-full min-h-0 overflow-y-auto bg-[#0d0908]">
+          <div className="relative isolate flex min-h-full flex-col items-center justify-center px-6 py-16">
             {/* Banner background image + overlays */}
             <img
               src="/images/hero-bg.jpg"
@@ -422,17 +422,17 @@ export default function ScanPage() {
   if (loading) {
     return (
       <AppShell>
-        <div className="relative h-full overflow-hidden bg-[#0d0908]">
-          <div className="absolute inset-0 bg-gradient-to-b from-black via-red-950/20 to-black" />
-          <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.02)_1px,transparent_1px)] [background-size:32px_32px]" />
+        <div className="h-full min-h-0 overflow-y-auto bg-[#0d0908]">
+          <div className="relative min-h-full">
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black via-red-950/20 to-black" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.02)_1px,transparent_1px)] [background-size:32px_32px]" />
           
           {/* Animated scanning effect */}
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent animate-shimmer" style={{
+          <div className="pointer-events-none sticky top-0 z-10 h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent animate-shimmer" style={{
             backgroundSize: '200% 100%',
           }} />
 
-          <div className="relative h-full overflow-y-auto">
-            <div className="mx-auto max-w-4xl px-6 py-16 space-y-8">
+            <div className="relative mx-auto max-w-4xl px-6 py-16 space-y-8">
               {/* Scanning Header */}
               <div className="text-center space-y-4">
                 <div className="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-red-950/30 ring-1 ring-red-500/30 backdrop-blur-xl">
@@ -484,15 +484,22 @@ export default function ScanPage() {
     );
   }
 
+  // Defensive guard: reached the results view without a report (transient state
+  // during report transitions). Hero view (line 267) and loading view cover all
+  // other combinations, so report is non-null past this point.
+  if (!report) {
+    return null;
+  }
+
   // Results view
   return (
     <AppShell>
-      <div className="relative min-h-full bg-[#0d0908]">
-        <div className="absolute inset-0 bg-gradient-to-b from-black via-transparent to-black pointer-events-none" />
-        <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.02)_1px,transparent_1px)] [background-size:32px_32px]" />
+      <div className="h-full min-h-0 overflow-y-auto bg-[#0d0908]">
+        <div className="relative min-h-full">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black via-transparent to-black" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.02)_1px,transparent_1px)] [background-size:32px_32px]" />
         
-        <div className="relative h-full overflow-y-auto">
-          <div className="mx-auto max-w-5xl px-6 py-10 space-y-8">
+          <div className="relative mx-auto max-w-5xl px-6 py-10 space-y-8">
             {/* Sticky Header with URL */}
             <div className="sticky top-0 z-10 -mx-6 px-6 pb-6 pt-6 bg-gradient-to-b from-[#0d0908] to-transparent backdrop-blur-sm">
               <Card className="bg-white/5 backdrop-blur-xl border-white/10 shadow-2xl">

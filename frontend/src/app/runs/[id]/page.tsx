@@ -136,25 +136,12 @@ export default function RunPage() {
     );
   }
 
-  if (loading.matrix && !matrix) {
-    return (
-      <AppShell>
-        <div className="flex h-full items-center justify-center">
-          <div className="text-center">
-            <div className="text-lg font-medium text-foreground">Loading analysis...</div>
-            <div className="text-sm text-muted-foreground mt-2">This may take a moment</div>
-          </div>
-        </div>
-      </AppShell>
-    );
-  }
-
   if (!matrix) {
     return (
       <AppShell>
-        <div className="flex h-full items-center justify-center">
-          <Card className="p-6 max-w-md">
-            <p className="text-muted-foreground">
+        <div className="flex h-full items-center justify-center bg-[#0d0908]">
+          <Card className="p-6 max-w-md bg-white/5 backdrop-blur-xl border-white/10">
+            <p className="text-white/70">
               {error || "No data available yet. The analysis may still be running."}
             </p>
             <Button className="mt-4" onClick={() => router.push("/")}>
