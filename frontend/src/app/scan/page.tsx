@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { API_BASE } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,7 @@ import {
   Zap,
 } from "lucide-react";
 
-export default function ScanPage() {
+function ScanPageContent() {
   const searchParams = useSearchParams();
   const [url, setUrl] = useState("");
   const [report, setReport] = useState<ScannerReportOut | null>(null);
@@ -750,5 +750,19 @@ export default function ScanPage() {
         </div>
       </div>
     </AppShell>
+  );
+}
+
+export default function ScanPage() {
+  return (
+    <Suspense fallback={
+      <AppShell>
+        <div className="h-screen w-screen flex items-center justify-center bg-[#0d0908]">
+          <LemmaLogo className="w-16 h-16 text-[#FACC15] animate-pulse" />
+        </div>
+      </AppShell>
+    }>
+      <ScanPageContent />
+    </Suspense>
   );
 }
