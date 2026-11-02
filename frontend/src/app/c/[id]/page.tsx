@@ -6,9 +6,47 @@ import { chat, streamEvents } from "@/lib/api";
 import type { ChatResponse, SSEEnvelope, SourceOut } from "@/types/api";
 import { AppShell } from "@/components/app-shell";
 import { cn } from "@/lib/utils";
-import { ExternalLink, Loader2, Plus, Send, Brain, Search, CheckCircle, ChevronDown, ChevronUp, Globe } from "lucide-react";
+import { ExternalLink, Plus, Send, Brain, Search, CheckCircle, ChevronDown, ChevronUp, Globe, FileText, Image as ImageIcon } from "lucide-react";
 import { MicIcon, type MicIconHandle } from "@/components/ui/mic-icon";
 import { Playfair_Display } from "next/font/google";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+
+// Type for Web Speech API
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: (event: SpeechRecognitionEvent) => void;
+  onerror: () => void;
+  onend: () => void;
+  start: () => void;
+  stop: () => void;
+}
+
+interface SpeechRecognitionEvent {
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionResultList {
+  length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+  isFinal: boolean;
+  [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+}
 
 const playfairDisplay = Playfair_Display({
     weight: ["700"],
@@ -17,6 +55,36 @@ const playfairDisplay = Playfair_Display({
     variable: "--font-playfair",
     display: "swap",
 });
+
+const QUICK_ACTIONS = [
+    {
+        label: "Analyze Policy",
+        template: "Analyze the following policy document for information gaps, inconsistencies, and missing data:\n\n[Paste policy name or document here]\n\nPlease identify:\n- Missing eligibility criteria\n- Unclear terms and conditions\n- Contradictory statements\n- Important dates or deadlines that are not specified",
+        icon: (
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+            </svg>
+        ),
+    },
+    {
+        label: "Check Benefits",
+        template: "Compare the benefits and eligibility requirements across these programs:\n\n[Program 1: URL or name]\n[Program 2: URL or name]\n[Program 3: URL or name]\n\nHelp me identify:\n- Which programs I'm eligible for\n- Key differences in benefits\n- Application requirements\n- Important deadlines",
+        icon: (
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c0 2.5 6 2.5 6 2.5s6 0 6-2.5v-5" />
+            </svg>
+        ),
+    },
+    {
+        label: "Verify Documents",
+        template: "Verify the claims and facts in the following document:\n\n[URL or paste document content here]\n\nCross-reference with trusted sources and identify:\n- Factual inaccuracies\n- Unsupported claims\n- Outdated information\n- Missing citations or sources",
+        icon: (
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18" />
+            </svg>
+        ),
+    },
+];
 
 interface ChatMessage {
   id: string;
@@ -57,14 +125,15 @@ export default function ChatPage() {
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const sourcesRef = useRef<SourceOut[]>([]);
   const verdictRef = useRef("");
   const stopRef = useRef<(() => void) | null>(null);
   const initialized = useRef(false);
   const micRef = useRef<MicIconHandle>(null);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const baseMessageRef = useRef<string>("");
   const loadingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -189,6 +258,13 @@ export default function ChatPage() {
     setIsStreaming(true);
     setError("");
     
+    // If Think mode is enabled, add a delay based on message length
+    if (isThinking) {
+      const thinkingDelay = text.length < 100 ? 2000 + Math.random() * 1000 : 5000 + Math.random() * 1000;
+      setLoadingState("Deep thinking");
+      await new Promise(resolve => setTimeout(resolve, thinkingDelay));
+    }
+    
     // Start cycling loading states
     let stateIndex = 0;
     setLoadingState(loadingStates[0].text);
@@ -304,7 +380,7 @@ export default function ChatPage() {
         loadingIntervalRef.current = null;
       }
     }
-  }, [isStreaming, finishResearch, loadingStates]);
+  }, [isStreaming, isThinking, finishResearch, loadingStates]);
 
   useEffect(() => {
     if (!sessionId || initialized.current) return;
@@ -414,7 +490,7 @@ export default function ChatPage() {
           {/* Add some top spacing */}
           <div className="w-full max-w-4xl mx-auto pt-8 space-y-6">
           {messages.length === 0 && (
-            <div className="flex flex-col items-center gap-3 text-center">
+            <div className="flex flex-col items-center gap-6 text-center">
               <span className={`${playfairDisplay.variable} font-playfair text-4xl font-bold italic text-white/40`}>
                 Lemma
               </span>
@@ -423,6 +499,24 @@ export default function ChatPage() {
                 <span className="text-white">"verify this claim..."</span>{" "}
                 and I&apos;ll research it for you — right here in this chat.
               </p>
+              
+              {/* Quick action pills */}
+              <div className="flex flex-wrap justify-center gap-3 mt-2 max-w-xl">
+                {QUICK_ACTIONS.map((action) => (
+                  <button
+                    key={action.label}
+                    disabled={isStreaming}
+                    onClick={() => {
+                      setInput(action.template);
+                      textareaRef.current?.focus();
+                    }}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm text-white/90 bg-white/10 border border-white/10 rounded-full backdrop-blur-sm hover:bg-white/15 hover:text-white transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none"
+                  >
+                    {action.icon}
+                    {action.label}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -605,7 +699,9 @@ export default function ChatPage() {
                 L
               </span>
               <div className="inline-flex items-center gap-3 rounded-2xl rounded-tl-sm px-4 py-3 text-white bg-[#2f2f2f]/50 shadow-sm border border-white/5">
-                {loadingState.toLowerCase().includes("thinking") || loadingState.toLowerCase().includes("analyzing") ? (
+                {loadingState.toLowerCase().includes("deep thinking") ? (
+                  <Brain className="w-5 h-5 text-blue-400 animate-pulse" />
+                ) : loadingState.toLowerCase().includes("thinking") || loadingState.toLowerCase().includes("analyzing") ? (
                   <Brain className="w-5 h-5 text-white animate-pulse" />
                 ) : loadingState.toLowerCase().includes("verifying") || loadingState.toLowerCase().includes("check") ? (
                   <CheckCircle className="w-5 h-5 text-white animate-pulse" />
@@ -622,29 +718,92 @@ export default function ChatPage() {
         {/* Bottom prompt bar — compact like ChatGPT */}
         <div className="shrink-0 px-4 pb-4 pt-2">
           <div className="mx-auto w-full max-w-3xl">
+            {/* Hidden file inputs */}
+            <input
+              ref={pdfInputRef}
+              type="file"
+              multiple
+              accept=".pdf,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword"
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files) {
+                  console.log('PDF/Doc files selected:', e.target.files);
+                  // Handle file upload here
+                }
+                e.target.value = '';
+              }}
+            />
+            <input
+              ref={imageInputRef}
+              type="file"
+              multiple
+              accept="image/*,.png,.jpg,.jpeg,.gif,.webp,.svg"
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files) {
+                  console.log('Image files selected:', e.target.files);
+                  // Handle file upload here
+                }
+                e.target.value = '';
+              }}
+            />
             <div className="relative flex items-end gap-3 rounded-3xl border border-white/20 bg-[#2f2f2f] px-4 py-3 shadow-lg">
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.docx,.doc,image/*,application/pdf"
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files) {
-                    // Handle file upload here
-                    console.log('Files selected:', e.target.files);
-                  }
-                  e.target.value = '';
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                aria-label="Attach"
-                className="p-1.5 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors shrink-0 mb-0.5"
-              >
-                <Plus className="w-5 h-5" />
-              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Attach files"
+                    className="p-1.5 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors shrink-0 mb-0.5"
+                  >
+                    <Plus className="w-5 h-5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="start"
+                  side="top"
+                  sideOffset={10}
+                  className="w-60 rounded-xl border-zinc-700/70 bg-[#262626] p-1.5 shadow-2xl"
+                >
+                  <DropdownMenuItem
+                    onClick={() => pdfInputRef.current?.click()}
+                    className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:bg-zinc-700/50 focus:text-white"
+                  >
+                    <FileText className="h-4 w-4 shrink-0 text-zinc-400" />
+                    <span>Upload or add files</span>
+                    <span className="ml-auto text-xs text-zinc-500">PDF, DOCX</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="my-1 bg-zinc-700/50" />
+                  <DropdownMenuItem
+                    onClick={() => imageInputRef.current?.click()}
+                    className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:bg-zinc-700/50 focus:text-white"
+                  >
+                    <ImageIcon className="h-4 w-4 shrink-0 text-zinc-400" />
+                    <span>Add photos</span>
+                    <span className="ml-auto text-xs text-zinc-500">PNG, JPG</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="my-1 bg-zinc-700/50" />
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setInput("Scan this article and verify its claims:\n\n[Paste article URL here]");
+                      textareaRef.current?.focus();
+                    }}
+                    className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:bg-zinc-700/50 focus:text-white"
+                  >
+                    <svg 
+                      className="h-4 w-4 shrink-0 text-zinc-400" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      strokeWidth="2"
+                    >
+                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                    </svg>
+                    <span>Scan a source</span>
+                    <span className="ml-auto text-xs text-zinc-500">URL</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <textarea
                 ref={textareaRef}
                 value={input}
@@ -664,14 +823,12 @@ export default function ChatPage() {
                 }}
                 placeholder="Ask anything…"
                 className={cn(
-                  "flex-1 bg-transparent border-none outline-none px-2 py-2 text-white placeholder-white/40 resize-none text-[15px] leading-6 overflow-y-hidden",
+                  "flex-1 bg-transparent border-none outline-none px-2 py-2 text-white placeholder-white/40 resize-none text-[15px] leading-6 overflow-y-auto scrollbar-hide",
                   "max-h-[200px]"
                 )}
                 rows={1}
                 style={{ 
-                  minHeight: '28px',
-                  scrollbarWidth: 'none',
-                  msOverflowStyle: 'none'
+                  minHeight: '28px'
                 }}
               />
               <div className="flex items-center gap-3 shrink-0 mb-0.5">

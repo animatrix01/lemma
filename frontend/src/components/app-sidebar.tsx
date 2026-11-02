@@ -151,7 +151,7 @@ export function AppSidebar({ hidden }: AppSidebarProps) {
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
             className={cn(
-                "relative z-40 hidden shrink-0 flex-col border-r border-white/5 bg-[#0d0908] text-sidebar-foreground transition-all duration-200 md:flex",
+                "relative z-40 hidden shrink-0 flex-col border-r border-white/5 bg-black text-sidebar-foreground transition-all duration-200 md:flex",
                 expanded ? "w-72" : "w-16",
                 playfairDisplay.variable
             )}

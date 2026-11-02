@@ -347,8 +347,16 @@ export const ClaudeChatInput: React.FC<ClaudeChatInputProps> = ({ onSendMessage,
         };
     }, []);
 
-    const handleSend = () => {
+    const handleSend = async () => {
         if (!message.trim() && files.length === 0 && pastedContent.length === 0) return;
+        
+        // If Think mode is enabled, add a delay based on message length
+        if (isThinkingEnabled && message.trim()) {
+            const thinkingDelay = message.length < 100 ? 2000 + Math.random() * 1000 : 5000 + Math.random() * 1000;
+            // You could add a loading state here if needed
+            await new Promise(resolve => setTimeout(resolve, thinkingDelay));
+        }
+        
         onSendMessage({ message, files, pastedContent, model: "sonnet-4.5", isThinkingEnabled });
         setMessage("");
         setFiles([]);
@@ -409,14 +417,12 @@ export const ClaudeChatInput: React.FC<ClaudeChatInputProps> = ({ onSendMessage,
                             placeholder=" "
                             disabled={disabled}
                             readOnly={readOnly}
-                            className="w-full bg-transparent border-0 outline-none text-white text-[15px] placeholder:text-transparent resize-none py-0.5 leading-relaxed block antialiased overflow-y-hidden"
+                            className="w-full bg-transparent border-0 outline-none text-white text-[15px] placeholder:text-transparent resize-none py-0.5 leading-relaxed block antialiased overflow-y-auto scrollbar-hide"
                             rows={1}
                             autoFocus={!readOnly}
                             style={{ 
                                 minHeight: '56px',
-                                maxHeight: '200px',
-                                scrollbarWidth: 'none',
-                                msOverflowStyle: 'none'
+                                maxHeight: '200px'
                             }}
                         />
                         {!message && (
